@@ -70,28 +70,17 @@ pub enum PieceType {
 /// `column` and `row` (As of now, they are zero based). It also has a `moves` counter, useful for
 /// moves such as castling.
 ///
-/// # Example:
-///
-/// To create a single piece
-///
-/// ```
-/// let mut p  = Piece::new(Color::White, PieceType::King, 0, 0);
-/// assert_eq!('K', p.as_fen());
-/// ```
-///
 #[derive(Debug, Clone, Copy)]
 pub struct Piece {
     pub color: Color,
     pub piece_type: PieceType,
-    pub rank: usize,
-    pub file: char,
     pub moves: u32,
 }
 
 // For convenience, we can implement a constructor for the Piece struct
 impl Piece {
-    pub fn new(color: Color, piece_type: PieceType, rank: usize, file: char) -> Self {
-        Piece { color, piece_type, rank, file, moves: 0 }
+    pub fn new(color: Color, piece_type: PieceType) -> Self {
+        Piece { color, piece_type, moves: 0 }
     }
 
     pub fn as_fen(&self) -> char {
@@ -117,13 +106,6 @@ impl Piece {
                 }
             }
         }
-    }
-
-    /*
-        The piece's board coordinate in algebraic notation
-     */
-    pub fn board_coordinate(&self) -> String {
-        format!("{}{}", self.rank, self.file)
     }
 }
 
@@ -162,22 +144,35 @@ impl PartialEq for Piece {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
-pub struct Square(Option<Piece>);
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub struct Square {
+    pub piece: Option<Piece>,
+    pub rank: usize,
+    pub file: char,
+}
 
 impl Square {
-    pub fn new(piece: Option<Piece>) -> Self {
-        Square(piece)
-    }
-
     pub fn is_empty(&self) -> bool {
-        self.0.is_none()
+        self.piece.is_none()
     }
 
     pub fn as_fen(&self) -> char {
-        self.0.unwrap().as_fen()
+        match self.piece {
+            Some(_) => self.piece.unwrap().as_fen(),
+            None => ' ',
+        }
     }
 }
+
+impl fmt::Display for Square {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self.piece {
+            None => write!(f, "-"),
+            Some(_) => write!(f, "{}{}", self.rank, self.file)
+        }
+    }
+}
+
 
 const FEN_REGEX: &str = concat!(
 r"(?<board>[KQRBNP1-8\/]+)\s+",
@@ -191,19 +186,36 @@ r"(?<fullmove>\d+)",
 
 pub struct ChessBoard {
     squares: [[Square; BOARD_SIZE]; BOARD_SIZE],
-    active_color: Color,
-    /// This is a counter of the halfmoves (or ply) since the last capture or pawn advance. This
+    /// Active Color: The next field indicates whose turn it is to move. "w" means it is White's
+    /// turn, and "b" means it is Black's turn.
+    pub active_color: Color,
+    /// Halfmoves counter: The number of halfmoves (or ply) since the last capture or pawn advance. This
     /// field is used for the fifty-move rule, which allows a player to claim a draw if no capture
     /// or pawn move has occurred in the last fifty moves.
-    half_moves: u32,
-    full_moves: u32,
-    passant_square: Option<Square>,
+    pub half_moves: u32,
+    /// Fullmove Counter: This is a counter of the full moves in the game. It starts at 1 and
+    /// increments after Black's move.
+    pub full_moves: u32,
+    /// En Passant Target Square: If there's a square where an en passant capture is possible, that
+    /// square is noted here. It's recorded using algebraic notation (e.g., "e3").
+    /// If there's no en passant target square, this is represented by a dash "-".
+    pub passant_square: Option<Square>,
 }
 
 const RANK_RANGE: RangeInclusive<usize> = 1..=BOARD_SIZE;
 const FILE_RANGE: RangeInclusive<char> = 'a'..='h';
 
-fn file_to_usize(file: &char) -> usize {
+/// Converts a chess rank to a zero-based index
+pub fn rank_to_index(rank: usize) -> usize{
+    match RANK_RANGE.contains(&rank) {
+        true => BOARD_SIZE - rank,
+        false => panic!("Rank must be a number between 1 and 8, you provided {rank}")
+    }
+}
+
+
+/// Converts a chess file to a zero-based index
+fn file_to_index(file: &char) -> usize {
     match file {
         'a' => 0,
         'b' => 1,
@@ -220,36 +232,25 @@ fn file_to_usize(file: &char) -> usize {
 
 impl ChessBoard {
     pub fn new() -> Self {
-        let empty_square = Square::new(None);
-        let squares = [[empty_square; BOARD_SIZE]; BOARD_SIZE]; // Initialize all squares to empty
+        let mut squares = [[Square::default(); BOARD_SIZE]; BOARD_SIZE];
+        // Each square obj knows it's location
+        for (i, rank) in RANK_RANGE.enumerate() {
+            for (j, file) in FILE_RANGE.enumerate() {
+                squares[i][j] = Square { piece: None, rank, file };
+            }
+        }
         ChessBoard { squares, active_color: Color::White, full_moves: 0, half_moves: 0, passant_square: None }
     }
 
     pub fn set_piece(&mut self, rank: usize, file: &char, color: Color, piece_type: PieceType) -> &mut ChessBoard {
-        if !RANK_RANGE.contains(&rank) {
-            panic!("Rank must be a number between 1 and 8, you provided {rank}")
-        }
-        if !FILE_RANGE.contains(&file) {
-            panic!("Rank must be a letter between a and h, you provided {file}")
-        }
-        self.squares[BOARD_SIZE - rank][file_to_usize(file)] = Square::new(Some(Piece::new(color, piece_type, rank, file.clone())));
+        let index_rank = rank_to_index(rank);
+        let index_file = file_to_index(file);
+        self.squares[index_rank][index_file].piece = Some(Piece::new(color, piece_type));
         self
     }
 
     pub fn get_piece(&self, rank: usize, file: &char) -> Option<Piece> {
-        if !RANK_RANGE.contains(&rank) {
-            panic!("Rank must be a number between 1 and 8, you provided {rank}")
-        }
-        if !FILE_RANGE.contains(&file) {
-            panic!("File must be a letter between a and h, you provided {file}")
-        }
-        self.squares[BOARD_SIZE - rank][file_to_usize(file)].0
-    }
-
-    /// Active Color: The next field indicates whose turn it is to move. "w" means it is White's
-    /// turn, and "b" means it is Black's turn.
-    pub fn active_color(&self) -> Color {
-        self.active_color
+        self.squares[rank_to_index(rank)][file_to_index(file)].piece
     }
 
     /*
@@ -277,34 +278,12 @@ impl ChessBoard {
         }
     }
 
-    /*
-        En Passant Target Square: If there's a square where an en passant capture is possible, that
-        square is noted here. It's recorded using algebraic notation (e.g., "e3").
-        If there's no en passant target square, this is represented by a dash "-".
-    */
-    pub fn passant_square(&self) -> String {
-        if self.passant_square.is_none() {
-            return '-'.to_string();
-        }
-        self.passant_square.unwrap().0.unwrap().board_coordinate()
-    }
-
-    /// Halfmove Clock: This is a counter of the halfmoves (or ply) since the last capture or pawn
-    /// advance. This field is used for the fifty-move rule, which allows a player to claim a draw
-    /// if no capture or pawn move has occurred in the last fifty moves.
-    pub fn half_moves(&self) -> u32 { self.half_moves }
-
-    /// Fullmove Counter: This is a counter of the full moves in the game. It starts at 1 and
-    /// Fullmove Counter: This is a counter of the full moves in the game. It starts at 1 and
-    /// increments after Black's move.
-    pub fn full_moves(&self) -> u32 { self.full_moves }
-
     pub fn print_board(&self) {
         print!("╭{}╮\n", "─".repeat(BOARD_SIZE * 4 - 1));
         for rank in 0..BOARD_SIZE {
             print!("│");
             for file in 0..BOARD_SIZE {
-                match self.squares[rank][file].0 {
+                match self.squares[rank][file].piece {
                     Some(piece) => print!(" {} │", piece),
                     None => print!("   │"),
                 }
@@ -341,9 +320,12 @@ impl ChessBoard {
             &*format!(" {} {} {} {} {}",
                       self.active_color,
                       self.get_castling_as_string(),
-                      self.passant_square(),
-                      self.half_moves(),
-                      self.full_moves())
+                      match self.passant_square {
+                          None => '-',
+                          Some(_) => self.passant_square.unwrap().as_fen()
+                      },
+                      self.half_moves,
+                      self.full_moves)
         );
         fen_code
     }
@@ -442,9 +424,15 @@ impl FromStr for ChessBoard {
 
             // En passant
             // TODO: Implement the rest of en passant rules
-            if passant == "-" {
-                board.passant_square = None;
-            }
+
+            board.passant_square = match passant {
+                "-" => None,
+                _ => {
+                    let p_file = passant.as_bytes()[0] as char;
+                    let p_rank = passant.as_bytes()[1] as usize;
+                    Some(board.squares[rank_to_index(p_rank)][file_to_index(&p_file)])
+                }
+            };
             board.half_moves = *halfmove;
             board.full_moves = *fullmove;
 

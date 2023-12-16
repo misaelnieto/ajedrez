@@ -1,12 +1,23 @@
 #[cfg(test)]
 mod tests {
     use std::str::FromStr;
-    use ajedrez::{ChessBoard, Color};
+
+    use ajedrez::{ChessBoard, Color, Piece, PieceType, Square};
 
     #[test]
     fn test_constructor() {
-        let mut board = ChessBoard::new();
+        let board = ChessBoard::new();
         assert_eq!("8/8/8/8/8/8/8/8 w - - 0 0", board.as_fen());
+    }
+
+    #[test]
+    fn test_piece_as_board_coordinate() {
+        let mut sq = Square::default();
+        assert_eq!("-", format!("{sq}"));
+        sq = Square { piece: Option::from(Piece::new(Color::White, PieceType::King)), rank: 8, file: 'a'};
+        assert_eq!("8a", format!("{sq}"));
+        sq = Square { piece: Option::from(Piece::new(Color::White, PieceType::King)), rank: 2, file: 'c'};
+        assert_eq!("2c", format!("{sq}"));
     }
 
     #[test]
@@ -86,14 +97,14 @@ mod tests {
         assert_eq!('R', board.get_piece(1, &'h').unwrap().as_fen());
 
         // Current turn/ active color
-        assert_eq!(Color::Black, board.active_color());
+        assert_eq!(Color::Black, board.active_color);
 
         // TODO: Castling
         // En passant
-        assert_eq!("-", board.passant_square());
+        assert_eq!(None, board.passant_square);
         // Half moves
-        assert_eq!(0, board.half_moves());
+        assert_eq!(0, board.half_moves);
         // Full moves
-        assert_eq!(1, board.full_moves());
+        assert_eq!(1, board.full_moves);
     }
 }
