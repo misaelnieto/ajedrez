@@ -212,7 +212,8 @@ pub struct ChessBoard {
     pub passant_square: Option<Square>,
 }
 
-const RANK_USIZE_RANGE: RangeInclusive<usize> = 49..=56;
+const RANK_USIZE_RANGE: RangeInclusive<usize> = 1..=8;
+const RANK_UNICODE_USIZE_RANGE: RangeInclusive<usize> = 49..=56;
 const RANK_CHAR_RANGE: RangeInclusive<char> = '1'..='8';
 const FILE_USIZE_RANGE: RangeInclusive<usize> = 97..=104;
 const FILE_CHAR_RANGE: RangeInclusive<char> = 'a'..='h';
@@ -266,7 +267,7 @@ impl FromStr for Move {
         if !FILE_USIZE_RANGE.contains(&(sb[0] as usize)) || !FILE_USIZE_RANGE.contains(&(sb[2] as usize)) {
             return Err(ParseError::InvalidPositionFile)
         }
-        if !RANK_USIZE_RANGE.contains(&(sb[1] as usize)) || !RANK_USIZE_RANGE.contains(&(sb[3] as usize)) {
+        if !RANK_UNICODE_USIZE_RANGE.contains(&(sb[1] as usize)) || !RANK_UNICODE_USIZE_RANGE.contains(&(sb[3] as usize)) {
             return Err(ParseError::InvalidPositionRank)
         }
 
