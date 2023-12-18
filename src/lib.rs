@@ -4,11 +4,21 @@ use std::str::FromStr;
 
 use regex::{Regex, RegexBuilder};
 
-use crate::ParseChessBoardError::EmptyString;
+use crate::ParseError::EmptyString;
 
-mod tests;
+#[derive(Debug, PartialEq, Eq)]
+pub enum ParseError {
+    EmptyString,
+    StringTooShort,
+    InvalidFENString,
+    InvalidPosition,
+    InvalidPositionRank,
+    InvalidPositionFile,
+}
 
 const BOARD_SIZE: usize = 8; // Chessboard is 8x8
+const RANK_BASE_U8: u8 = '1' as u8;
+const FILE_BASE_U8: u8 = 'a' as u8;
 
 
 /// The two different colors for the pieces
@@ -202,12 +212,15 @@ pub struct ChessBoard {
     pub passant_square: Option<Square>,
 }
 
-const RANK_RANGE: RangeInclusive<usize> = 1..=BOARD_SIZE;
-const FILE_RANGE: RangeInclusive<char> = 'a'..='h';
+const RANK_USIZE_RANGE: RangeInclusive<usize> = 49..=56;
+const RANK_CHAR_RANGE: RangeInclusive<char> = '1'..='8';
+const FILE_USIZE_RANGE: RangeInclusive<usize> = 97..=104;
+const FILE_CHAR_RANGE: RangeInclusive<char> = 'a'..='h';
+
 
 /// Converts a chess rank to a zero-based index
 pub fn rank_to_index(rank: usize) -> usize{
-    match RANK_RANGE.contains(&rank) {
+    match RANK_USIZE_RANGE.contains(&rank) {
         true => BOARD_SIZE - rank,
         false => panic!("Rank must be a number between 1 and 8, you provided {rank}")
     }
@@ -229,13 +242,55 @@ fn file_to_index(file: &char) -> usize {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Move {
+    pub from: (usize, usize),
+    pub to: (usize, usize),
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub enum ChessMoveError{
+    OutOfBounds,
+    StartPieceMissing,
+}
+
+impl FromStr for Move {
+    type Err = ParseError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let sb = s.as_bytes();
+        if s.len() != 4 {
+            return Err(ParseError::StringTooShort)
+        }
+
+        if !FILE_USIZE_RANGE.contains(&(sb[0] as usize)) || !FILE_USIZE_RANGE.contains(&(sb[2] as usize)) {
+            return Err(ParseError::InvalidPositionFile)
+        }
+        if !RANK_USIZE_RANGE.contains(&(sb[1] as usize)) || !RANK_USIZE_RANGE.contains(&(sb[3] as usize)) {
+            return Err(ParseError::InvalidPositionRank)
+        }
+
+        let mov = Move{
+            from: (
+                BOARD_SIZE - 1 - (sb[1] - RANK_BASE_U8) as usize,
+                (sb[0] - FILE_BASE_U8) as usize,
+            ),
+            to: (
+                BOARD_SIZE - 1 - (sb[3] - RANK_BASE_U8) as usize,
+                (sb[2] - FILE_BASE_U8) as usize,
+            )
+        };
+        Ok(mov)
+    }
+
+}
 
 impl ChessBoard {
     pub fn new() -> Self {
         let mut squares = [[Square::default(); BOARD_SIZE]; BOARD_SIZE];
         // Each square obj knows it's location
-        for (i, rank) in RANK_RANGE.enumerate() {
-            for (j, file) in FILE_RANGE.enumerate() {
+        for (i, rank) in RANK_USIZE_RANGE.enumerate() {
+            for (j, file) in FILE_CHAR_RANGE.enumerate() {
                 squares[i][j] = Square { piece: None, rank, file };
             }
         }
@@ -329,27 +384,42 @@ impl ChessBoard {
         );
         fen_code
     }
+
+    pub fn move_piece(&mut self, mov: Move) -> Result<(), ChessMoveError> {
+        let (from_x, from_y) = mov.from;
+        let (to_x, to_y) = mov.to;
+
+        // Verify the move is within the bounds of the board
+        if from_x >= BOARD_SIZE || from_y >= BOARD_SIZE || to_x >= BOARD_SIZE || to_y >= BOARD_SIZE {
+            return Err(ChessMoveError::OutOfBounds);
+        }
+
+        // Retrieve the piece from the starting square
+        let piece = match self.squares[from_x][from_y].piece {
+            Some(piece) => piece,
+            None => return Err(ChessMoveError::StartPieceMissing),
+        };
+        // Remove the piece from the starting square
+        self.squares[from_x][from_y].piece = None;
+        self.squares[from_x][from_y].piece = Some(piece);
+
+        Ok(())
+    }
 }
 
-
-#[derive(Debug, PartialEq, Eq)]
-pub enum ParseChessBoardError{
-    EmptyString,
-    InvalidFENString,
-}
 
 impl FromStr for ChessBoard {
-    type Err = ParseChessBoardError;
-    fn from_str(s: &str) -> Result<Self, ParseChessBoardError> {
+    type Err = ParseError;
+    fn from_str(s: &str) -> Result<Self, ParseError> {
         if s.is_empty() { return Err(EmptyString); }
-        fn from_fen_str(representation: &str) -> Result<ChessBoard, ParseChessBoardError> {
+        fn from_fen_str(representation: &str) -> Result<ChessBoard, ParseError> {
             let re: Regex = RegexBuilder::new(FEN_REGEX)
                 .case_insensitive(true)
                 .build()
                 .unwrap();
 
             if !re.is_match(representation) {
-                return Err(ParseChessBoardError::InvalidFENString);
+                return Err(ParseError::InvalidFENString);
             }
             let caps = re.captures(representation).unwrap();
             let pieces = &caps["board"];
@@ -360,7 +430,7 @@ impl FromStr for ChessBoard {
             let fullmove = &caps["fullmove"].parse::<u32>().unwrap();
 
             let mut rank: usize = BOARD_SIZE;
-            let mut file_iter = FILE_RANGE.cycle();
+            let mut file_iter = FILE_CHAR_RANGE.cycle();
             let mut board = ChessBoard::new();
 
 
@@ -410,7 +480,7 @@ impl FromStr for ChessBoard {
                     }
                     '/' => {
                         rank -=1;
-                        file_iter = FILE_RANGE.cycle();
+                        file_iter = FILE_CHAR_RANGE.cycle();
                     }
                     _ => {}
                 }

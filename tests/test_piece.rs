@@ -1,3 +1,5 @@
+mod tests;
+
 #[cfg(test)]
 mod test {
     use ajedrez::{Color, Piece, PieceType};

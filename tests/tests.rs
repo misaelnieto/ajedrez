@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod tests {
-    use crate::{ChessBoard, Color, PieceType};
+    use ajedrez::{ChessBoard, Color, PieceType};
 
     #[test]
     fn test_board_fen_code() {
@@ -13,7 +13,4 @@ mod tests {
 
         assert_eq!("R6R/8/8/8/8/8/8/r6r w - - 0 0", board.as_fen());
     }
-
-
-
 }
