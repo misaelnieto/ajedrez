@@ -1,5 +1,5 @@
 use std::fmt;
-use std::ops::RangeInclusive;
+use std::ops::{Range, RangeInclusive};
 use std::str::FromStr;
 
 use regex::{Regex, RegexBuilder};
@@ -14,12 +14,17 @@ pub enum ParseError {
     InvalidPosition,
     InvalidPositionRank,
     InvalidPositionFile,
+    UselessMove,
 }
 
 const BOARD_SIZE: usize = 8; // Chessboard is 8x8
+const BOARD_SIZE_RANGE_0: Range<usize> = 0..BOARD_SIZE;
+const BOARD_SIZE_RANGE_1: RangeInclusive<usize> = 1..=BOARD_SIZE;
 const RANK_BASE_U8: u8 = '1' as u8;
 const FILE_BASE_U8: u8 = 'a' as u8;
-
+const RANK_UNICODE_USIZE_RANGE: RangeInclusive<usize> = 49..=56;
+const FILE_USIZE_RANGE: RangeInclusive<usize> = 97..=104;
+const FILE_CHAR_RANGE: RangeInclusive<char> = 'a'..='h';
 
 /// The two different colors for the pieces
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
@@ -212,16 +217,10 @@ pub struct ChessBoard {
     pub passant_square: Option<Square>,
 }
 
-const RANK_USIZE_RANGE: RangeInclusive<usize> = 1..=8;
-const RANK_UNICODE_USIZE_RANGE: RangeInclusive<usize> = 49..=56;
-const RANK_CHAR_RANGE: RangeInclusive<char> = '1'..='8';
-const FILE_USIZE_RANGE: RangeInclusive<usize> = 97..=104;
-const FILE_CHAR_RANGE: RangeInclusive<char> = 'a'..='h';
-
 
 /// Converts a chess rank to a zero-based index
 pub fn rank_to_index(rank: usize) -> usize{
-    match RANK_USIZE_RANGE.contains(&rank) {
+    match BOARD_SIZE_RANGE_1.contains(&rank) {
         true => BOARD_SIZE - rank,
         false => panic!("Rank must be a number between 1 and 8, you provided {rank}")
     }
@@ -253,6 +252,7 @@ pub struct Move {
 pub enum ChessMoveError{
     OutOfBounds,
     StartPieceMissing,
+    NotImplemented,
 }
 
 impl FromStr for Move {
@@ -281,16 +281,18 @@ impl FromStr for Move {
                 (sb[2] - FILE_BASE_U8) as usize,
             )
         };
+        if mov.from == mov.to {
+            return Err(ParseError::UselessMove)
+        }
         Ok(mov)
     }
-
 }
 
 impl ChessBoard {
     pub fn new() -> Self {
         let mut squares = [[Square::default(); BOARD_SIZE]; BOARD_SIZE];
         // Each square obj knows it's location
-        for (i, rank) in RANK_USIZE_RANGE.enumerate() {
+        for (i, rank) in BOARD_SIZE_RANGE_1.enumerate() {
             for (j, file) in FILE_CHAR_RANGE.enumerate() {
                 squares[i][j] = Square { piece: None, rank, file };
             }
@@ -386,6 +388,76 @@ impl ChessBoard {
         fen_code
     }
 
+    // Moves system
+    pub fn generate_pawn_moves(&self, position: (usize, usize)) -> Vec<Move> {
+        let mut moves = Vec::new();
+        let (x, y) = position;
+
+        // Get the pawn at the current position
+        let pawn = match self.squares[x][y].piece {
+            Some(p) => p,
+            None => return moves, // No pawn, so no moves.
+        };
+
+        // Ensure that the piece is a pawn
+        if pawn.piece_type != PieceType::Pawn {
+            return moves; // Not a pawn, so no moves.
+        }
+
+        // Determine the direction depending on the pawn's color
+        let mut direction:isize = if pawn.color == Color::White { -1 } else { 1 };
+
+        // Can only move forward within the RANK range
+        let mut fwd = (x as isize + direction) as usize;
+        if BOARD_SIZE_RANGE_0.contains(&fwd) {
+            if self.squares[fwd][y].is_empty() {
+                moves.push(Move { from: position, to: (fwd, y) });
+            }
+
+            // Capture diagonally, to the left, except for first file/column
+            if (y as isize - 1) > 0 {
+                let left = y - 1;
+                if BOARD_SIZE_RANGE_0.contains(&left) && !self.squares[fwd][left].is_empty() {
+                    moves.push(Move { from: position, to: (fwd, left) });
+                }
+            }
+
+            // Capture diagonally, to the right, except for last file/column
+            let right = y + 1;
+            if BOARD_SIZE_RANGE_0.contains(&right) && !self.squares[fwd][right].is_empty() {
+                moves.push(Move { from: position, to: (fwd, right) });
+            }
+        }
+
+        // Initial two-square move
+        // Make sure to check the pawn is in the initial position and
+        // there's no piece two squares ahead.
+        let initial_position = match pawn.color {
+            Color::White => {x == 6},
+            Color::Black => {x == 1}
+        };
+        if initial_position {
+            direction *= 2;
+            fwd = (x as isize + direction) as usize;
+            if self.squares[x][y].piece.unwrap().moves == 0 && self.squares[fwd][y].is_empty() {
+                moves.push(Move { from: position, to: (fwd, y) });
+            }
+        }
+
+        // TODO: en passant
+        moves
+    }
+
+    pub fn generate_moves(&self, position: (usize, usize)) -> Result<Vec<Move>, ChessMoveError> {
+        if self.squares[position.0][position.1].is_empty() {
+            return Err(ChessMoveError::StartPieceMissing);
+        }
+        match self.squares[position.0][position.1].piece.unwrap().piece_type {
+            PieceType::Pawn => Ok(self.generate_pawn_moves(position)),
+            _ => Err(ChessMoveError::NotImplemented)
+        }
+    }
+
     pub fn move_piece(&mut self, mov: Move) -> Result<(), ChessMoveError> {
         let (from_x, from_y) = mov.from;
         let (to_x, to_y) = mov.to;
@@ -400,6 +472,7 @@ impl ChessBoard {
             Some(piece) => piece,
             None => return Err(ChessMoveError::StartPieceMissing),
         };
+
         // Remove the piece from the starting square
         self.squares[from_x][from_y].piece = None;
         self.squares[from_x][from_y].piece = Some(piece);
