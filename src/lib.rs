@@ -481,10 +481,67 @@ impl ChessBoard {
             }
 
             // Verify that the square is either empty or occupied by an opponent's piece
-            // let dest_square = board.get_piece(new_x as usize, new_y as usize);
             let dest_square:Square = self.squares[new_x as usize][new_y as usize];
             if dest_square.is_empty() || dest_square.piece.unwrap().color != knight.color {
                 moves.push(Move { from: position, to: (new_x as usize, new_y as usize) });
+            }
+        }
+
+        moves
+    }
+
+
+    pub fn generate_bishop_moves(&self, position: (usize, usize)) -> Vec<Move> {
+        let mut moves = Vec::new();
+        // Get the bishop at the current position
+        let bishop = match self.squares[position.0][position.1].piece {
+            Some(p) => p,
+            None => return moves, // No bishop, so no moves.
+        };
+
+        // Ensure that the piece is a bishop
+        if bishop.piece_type != PieceType::Bishop {
+            return moves; // Not a bishop, so no moves.
+        }
+
+        // Diagonal offsets
+        let directions = [(-1, -1), (-1, 1), (1, -1), (1, 1)];
+
+        // Iterate in all diagonal directions
+        for &(dx, dy) in &directions {
+            let (mut x, mut y) = position;
+
+            loop {
+                x = (x as isize).wrapping_add(dx) as usize;
+                y = (y as isize).wrapping_add(dy) as usize;
+
+                // Break the loop if the move is off the board
+                if x >= BOARD_SIZE || y >= BOARD_SIZE {
+                    break;
+                }
+
+                let current_position = (x, y);
+
+                match self.squares[x][y].piece {
+                    Some(piece) => {
+                        // If there's a piece of the opposite color, it can be captured
+                        let dest_square:Square = self.squares[x][y];
+                        if piece.color != dest_square.piece.unwrap().color {
+                            moves.push(Move {
+                                from: position,
+                                to: current_position,
+                            });
+                        }
+                        break; // Stop moving in this direction whether a piece was captured or it's blocked
+                    }
+                    None => {
+                        // If the square is empty, it's a valid move
+                        moves.push(Move {
+                            from: position,
+                            to: current_position,
+                        });
+                    }
+                }
             }
         }
 
@@ -497,7 +554,7 @@ impl ChessBoard {
         }
         match self.squares[position.0][position.1].piece.unwrap().piece_type {
             PieceType::Pawn => Ok(self.generate_pawn_moves(position)),
-            PieceType::King => Ok(self.generate_knight_moves(position)),
+            PieceType::Knight => Ok(self.generate_knight_moves(position)),
             _ => Err(ChessMoveError::NotImplemented)
         }
     }

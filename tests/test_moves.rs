@@ -144,4 +144,94 @@ mod tests {
         assert_eq!((4,3), possible_moves[6].to);
         assert_eq!((3,4), possible_moves[7].to);
     }
+
+    #[test]
+    fn test_generate_bishop_moves_base() {
+        let board = ChessBoard::from_str("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR b KQkq - 0 1").unwrap();
+
+        // Fail gracefully: On this initial setup, bishops cannot move at all
+        for i in BOARD_SIZE_RANGE_0 {
+            for j in BOARD_SIZE_RANGE_0 {
+                let possible_moves = board.generate_bishop_moves((i, j));
+                assert_eq!(0, possible_moves.len());
+            }
+        }
+    }
+
+    #[test]
+    fn test_generate_bishop_moves_initial_empty() {
+        let board = ChessBoard::from_str("2b2b2/8/8/8/8/8/8/2B2B2 w - - 0 0").unwrap();
+        let default_bishop_positions = [(0, 2), (0, 5), (7, 2), (7, 5)];
+
+        // Default movements for Knight at c8
+        let mut possible_moves = board.generate_bishop_moves(default_bishop_positions[0]);
+        assert_eq!(7, possible_moves.len());
+        assert_eq!((1, 1), possible_moves[0].to);
+        assert_eq!((2, 0), possible_moves[1].to);
+        assert_eq!((2, 4), possible_moves[3].to);
+        assert_eq!((3, 5), possible_moves[4].to);
+        assert_eq!((4, 6), possible_moves[5].to);
+        assert_eq!((5, 7), possible_moves[6].to);
+
+        // Default movements for Knight at f8
+        possible_moves = board.generate_bishop_moves(default_bishop_positions[1]);
+        assert_eq!(7, possible_moves.len());
+        assert_eq!((1, 4), possible_moves[0].to);
+        assert_eq!((2, 3), possible_moves[1].to);
+        assert_eq!((4, 1), possible_moves[3].to);
+        assert_eq!((5, 0), possible_moves[4].to);
+        assert_eq!((1, 6), possible_moves[5].to);
+        assert_eq!((2, 7), possible_moves[6].to);
+
+        // Default movements for Knight at c8
+        possible_moves = board.generate_bishop_moves(default_bishop_positions[2]);
+        assert_eq!(7, possible_moves.len());
+        assert_eq!((6, 1), possible_moves[0].to);
+        assert_eq!((5, 0), possible_moves[1].to);
+        assert_eq!((5, 4), possible_moves[3].to);
+        assert_eq!((4, 5), possible_moves[4].to);
+        assert_eq!((3, 6), possible_moves[5].to);
+        assert_eq!((2, 7), possible_moves[6].to);
+
+        // Default movements for Knight at c8
+        possible_moves = board.generate_bishop_moves(default_bishop_positions[3]);
+        assert_eq!(7, possible_moves.len());
+        assert_eq!((6, 4), possible_moves[0].to);
+        assert_eq!((5, 3), possible_moves[1].to);
+        assert_eq!((3, 1), possible_moves[3].to);
+        assert_eq!((2, 0), possible_moves[4].to);
+        assert_eq!((6, 6), possible_moves[5].to);
+        assert_eq!((5, 7), possible_moves[6].to);
+    }
+
+    #[test]
+    fn test_generate_bishop_moves_x() {
+        let board = ChessBoard::from_str("8/3p4/8/5B2/3b4/8/2P5/8 w - - 0 0").unwrap();
+
+        // Available movements for Bishop at d4
+        let mut possible_moves = board.generate_bishop_moves((4, 3));
+        assert_eq!(13, possible_moves.len());
+        assert_eq!((3, 2), possible_moves[0].to);
+        assert_eq!((2, 1), possible_moves[1].to);
+        assert_eq!((3, 4), possible_moves[3].to);
+        assert_eq!((2, 5), possible_moves[4].to);
+        assert_eq!((1, 6), possible_moves[5].to);
+        assert_eq!((0, 7), possible_moves[6].to);
+        assert_eq!((5, 2), possible_moves[7].to);
+        assert_eq!((6, 1), possible_moves[8].to);
+        assert_eq!((7, 0), possible_moves[9].to);
+        assert_eq!((5, 4), possible_moves[10].to);
+        assert_eq!((6, 5), possible_moves[11].to);
+        assert_eq!((7, 6), possible_moves[12].to);
+
+        // Available movements for Bishop at f5
+        possible_moves = board.generate_bishop_moves((3, 5));
+        assert_eq!(7, possible_moves.len());
+        assert_eq!((2, 4), possible_moves[0].to);
+        assert_eq!((2, 6), possible_moves[1].to);
+        assert_eq!((4, 4), possible_moves[3].to);
+        assert_eq!((5, 3), possible_moves[4].to);
+        assert_eq!((4, 6), possible_moves[5].to);
+        assert_eq!((5, 7), possible_moves[6].to);
+    }
 }
