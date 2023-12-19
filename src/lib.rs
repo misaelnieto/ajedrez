@@ -17,8 +17,8 @@ pub enum ParseError {
     UselessMove,
 }
 
-const BOARD_SIZE: usize = 8; // Chessboard is 8x8
-const BOARD_SIZE_RANGE_0: Range<usize> = 0..BOARD_SIZE;
+pub const BOARD_SIZE: usize = 8; // Chessboard is 8x8
+pub const BOARD_SIZE_RANGE_0: Range<usize> = 0..BOARD_SIZE;
 const BOARD_SIZE_RANGE_1: RangeInclusive<usize> = 1..=BOARD_SIZE;
 const RANK_BASE_U8: u8 = '1' as u8;
 const FILE_BASE_U8: u8 = 'a' as u8;
@@ -448,12 +448,56 @@ impl ChessBoard {
         moves
     }
 
+    pub fn generate_knight_moves(&self, position: (usize, usize)) -> Vec<Move> {
+        let (x, y) = position;
+        let mut moves = Vec::new();
+
+        // Get the knight at the current position
+        let knight = match self.squares[x][y].piece {
+            Some(p) => p,
+            None => return moves, // No knight, so no moves.
+        };
+
+        // Ensure that the piece is a knight
+        if knight.piece_type != PieceType::Knight {
+            return moves; // Not a knight, so no moves.
+        }
+
+        let knight_moves = [
+            (1, 2), (2, 1),    // Moves to the right and up
+            (-1, 2), (-2, 1),  // Moves to the left and up
+            (1, -2), (2, -1),  // Moves to the right and down
+            (-1, -2), (-2, -1) // Moves to the left and down
+        ];
+
+        for &(dx, dy) in knight_moves.iter() {
+            let new_x = x as isize + dx;
+            let new_y = y as isize + dy;
+
+            // Verify the move is within the bounds of the board
+            if !(new_x >= 0 && new_x < BOARD_SIZE as isize &&
+                new_y >= 0 && new_y < BOARD_SIZE as isize) {
+                continue;
+            }
+
+            // Verify that the square is either empty or occupied by an opponent's piece
+            // let dest_square = board.get_piece(new_x as usize, new_y as usize);
+            let dest_square:Square = self.squares[new_x as usize][new_y as usize];
+            if dest_square.is_empty() || dest_square.piece.unwrap().color != knight.color {
+                moves.push(Move { from: position, to: (new_x as usize, new_y as usize) });
+            }
+        }
+
+        moves
+    }
+
     pub fn generate_moves(&self, position: (usize, usize)) -> Result<Vec<Move>, ChessMoveError> {
         if self.squares[position.0][position.1].is_empty() {
             return Err(ChessMoveError::StartPieceMissing);
         }
         match self.squares[position.0][position.1].piece.unwrap().piece_type {
             PieceType::Pawn => Ok(self.generate_pawn_moves(position)),
+            PieceType::King => Ok(self.generate_knight_moves(position)),
             _ => Err(ChessMoveError::NotImplemented)
         }
     }
