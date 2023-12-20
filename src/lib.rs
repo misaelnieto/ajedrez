@@ -548,6 +548,57 @@ impl ChessBoard {
         moves
     }
 
+
+    pub fn generate_rook_moves(&self, position: (usize, usize)) -> Vec<Move> {
+        let (mut x, mut y) = position;
+        let mut moves = Vec::new();
+
+        // Get the rook at the current position
+        let rook = match self.squares[x][y].piece {
+            Some(p) => p,
+            None => return moves, // No rook, so no moves.
+        };
+
+        // Ensure that the piece is a rook
+        if rook.piece_type != PieceType::Rook {
+            return moves; // Not a rook, so no moves.
+        }
+
+        // Define the four possible directions in which a rook can move: up, down, left, right
+        let directions = [(-1, 0), (1, 0), (0, -1), (0, 1)];
+
+
+        for &(dx, dy) in &directions {
+            (x, y) = position;
+            loop {
+                x = (x as isize).wrapping_add(dx) as usize;
+                y = (y as isize).wrapping_add(dy) as usize;
+
+                // Stop the loop if the new position is off the board
+                if x >= BOARD_SIZE || y >= BOARD_SIZE {
+                    break;
+                }
+
+                match self.squares[x][y].piece {
+                    Some(piece) => {
+                        // If there's a piece of the opposite color, it can be captured
+                        if piece.color != rook.color {
+                            moves.push(Move { from: position, to: (x, y) });
+                        }
+                        // Whether it's a capture or not, the rook can't move past this piece
+                        break;
+                    }
+                    None => {
+                        // Add the move to the list if the square is empty
+                        moves.push(Move { from: position, to: (x, y) });
+                    }
+                }
+            }
+        }
+
+        moves
+    }
+
     pub fn generate_moves(&self, position: (usize, usize)) -> Result<Vec<Move>, ChessMoveError> {
         if self.squares[position.0][position.1].is_empty() {
             return Err(ChessMoveError::StartPieceMissing);
@@ -555,6 +606,8 @@ impl ChessBoard {
         match self.squares[position.0][position.1].piece.unwrap().piece_type {
             PieceType::Pawn => Ok(self.generate_pawn_moves(position)),
             PieceType::Knight => Ok(self.generate_knight_moves(position)),
+            PieceType::Bishop => Ok(self.generate_bishop_moves(position)),
+            PieceType::Rook => Ok(self.generate_rook_moves(position)),
             _ => Err(ChessMoveError::NotImplemented)
         }
     }

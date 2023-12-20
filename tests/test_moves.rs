@@ -234,4 +234,47 @@ mod tests {
         assert_eq!((4, 6), possible_moves[5].to);
         assert_eq!((5, 7), possible_moves[6].to);
     }
+
+    #[test]
+    fn test_generate_rook_moves_base() {
+        let board = ChessBoard::from_str("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR b KQkq - 0 1").unwrap();
+
+        // Fail gracefully: On this initial setup, rooks cannot move at all
+        for i in BOARD_SIZE_RANGE_0 {
+            for j in BOARD_SIZE_RANGE_0 {
+                let possible_moves = board.generate_rook_moves((i, j));
+                assert_eq!(0, possible_moves.len());
+            }
+        }
+    }
+
+    #[test]
+    fn test_generate_rook_moves_wikipedia() {
+        // Example board taken from wikipedia
+        let board = ChessBoard::from_str("8/4P1r1/8/6p1/3R4/8/8/8 w - - 0 0").unwrap();
+
+        // Available movements for Rook at g7, 4 to empty squares and 1 capture (e7)
+        let mut possible_moves = board.generate_rook_moves((1, 6));
+        assert_eq!(5, possible_moves.len());
+        assert_eq!((0, 6), possible_moves[0].to);
+        assert_eq!((2, 6), possible_moves[1].to);
+        assert_eq!((1, 5), possible_moves[2].to);
+        assert_eq!((1, 4), possible_moves[3].to);
+        assert_eq!((1, 7), possible_moves[4].to);
+
+        // Available movements for Rook at d4
+        possible_moves = board.generate_rook_moves((4, 3));
+        assert_eq!(14, possible_moves.len());
+        assert_eq!((3, 3), possible_moves[0].to);
+        assert_eq!((2, 3), possible_moves[1].to);
+        assert_eq!((0, 3), possible_moves[3].to);
+        assert_eq!((5, 3), possible_moves[4].to);
+        assert_eq!((6, 3), possible_moves[5].to);
+        assert_eq!((7, 3), possible_moves[6].to);
+        assert_eq!((4, 2), possible_moves[7].to);
+        assert_eq!((4, 1), possible_moves[8].to);
+        assert_eq!((4, 0), possible_moves[9].to);
+        assert_eq!((4, 4), possible_moves[10].to);
+        assert_eq!((4, 5), possible_moves[11].to);
+    }
 }
