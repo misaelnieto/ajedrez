@@ -525,8 +525,7 @@ impl ChessBoard {
                 match self.squares[x][y].piece {
                     Some(piece) => {
                         // If there's a piece of the opposite color, it can be captured
-                        let dest_square:Square = self.squares[x][y];
-                        if piece.color != dest_square.piece.unwrap().color {
+                        if piece.color != bishop.color {
                             moves.push(Move {
                                 from: position,
                                 to: current_position,
@@ -599,6 +598,52 @@ impl ChessBoard {
         moves
     }
 
+    pub fn generate_king_moves(&self, position: (usize, usize)) -> Vec<Move> {
+        let mut moves = Vec::new();
+        let king = match self.squares[position.0][position.1].piece {
+            Some(p) => p,
+            None => return moves, // No king, so no moves.
+        };
+
+        // Ensure that the piece is a king
+        if king.piece_type != PieceType::King {
+            return moves; // Not a king, so no moves.
+        }
+        // Offsets for the eight possible moves a king can make
+        let move_offsets = [
+            (-1, -1), (0, -1), (1, -1),
+            (-1,  0),          (1,  0),
+            (-1,  1), (0,  1), (1,  1),
+        ];
+
+        for &(dx, dy) in &move_offsets {
+            let new_x = position.0 as isize + dx;
+            let new_y = position.1 as isize + dy;
+
+            // Ensure the new coordinates are within the board boundaries
+            if new_x >= 0 && new_x < BOARD_SIZE as isize && new_y >= 0 && new_y < BOARD_SIZE as isize {
+                match self.squares[new_x as usize][new_y as usize].piece {
+                    Some(piece) => {
+                        // If the square is occupied by an opponent's piece, it's a capture move
+                        if piece.color != king.color {
+                            moves.push(Move { from: position, to: (new_x as usize, new_y as usize) });
+                        }
+                        // Otherwise, the king cannot move into a square occupied by an allied piece
+                    }
+                    None => {
+                        // If the square is unoccupied, it's a valid move
+                        moves.push(Move { from: position, to: (new_x as usize, new_y as usize) });
+                    }
+                }
+            }
+        }
+
+        // Castling could be added here if you are checking board state, i.e., whether rooks and king
+        // have moved, and if there is a clear path for castling.
+
+        moves
+    }
+
     pub fn generate_moves(&self, position: (usize, usize)) -> Result<Vec<Move>, ChessMoveError> {
         if self.squares[position.0][position.1].is_empty() {
             return Err(ChessMoveError::StartPieceMissing);
@@ -608,6 +653,7 @@ impl ChessBoard {
             PieceType::Knight => Ok(self.generate_knight_moves(position)),
             PieceType::Bishop => Ok(self.generate_bishop_moves(position)),
             PieceType::Rook => Ok(self.generate_rook_moves(position)),
+            PieceType::King => Ok(self.generate_king_moves(position)),
             _ => Err(ChessMoveError::NotImplemented)
         }
     }
