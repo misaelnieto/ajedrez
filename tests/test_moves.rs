@@ -2,7 +2,7 @@
 mod tests {
     use std::str::FromStr;
 
-    use ajedrez::{ChessBoard, Move, ParseError, BOARD_SIZE_RANGE_0};
+    use ajedrez::{ChessBoard, Move, ParseError, BOARD_SIZE_RANGE_0, pos_from_str};
 
     #[test]
     fn test_move_from_str() {
@@ -325,5 +325,91 @@ mod tests {
         // Available movements for King at d4 are zero
         let possible_moves = board.generate_king_moves((4, 3));
         assert_eq!(0, possible_moves.len());
+    }
+
+    #[test]
+    fn test_generate_queen_moves_initial() {
+        let board = ChessBoard::from_str("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR b KQkq - 0 1").unwrap();
+
+        // Fail gracefully: On this initial setup, the queen cannot move at all
+        // and the rest of the pieces will not generate moves for generate_queen_moves()
+        for i in BOARD_SIZE_RANGE_0 {
+            for j in BOARD_SIZE_RANGE_0 {
+                let possible_moves = board.generate_queen_moves((i, j));
+                assert_eq!(0, possible_moves.len());
+            }
+        }
+    }
+
+    #[test]
+    fn test_generate_queen_moves_initial_empty() {
+        let board = ChessBoard::from_str("3q4/8/8/8/8/8/8/3Q4 b - - 0 0").unwrap();
+
+        // Available movements for Queen at d8
+        let mut possible_moves = board.generate_queen_moves(pos_from_str("d8").unwrap());
+        assert_eq!(21, possible_moves.len());
+        assert_eq!((1, 3), possible_moves[0].to);
+        assert_eq!((2, 3), possible_moves[1].to);
+        assert_eq!((3, 3), possible_moves[2].to);
+        assert_eq!((4, 3), possible_moves[3].to);
+        assert_eq!((5, 3), possible_moves[4].to);
+        assert_eq!((6, 3), possible_moves[5].to);
+        assert_eq!((7, 3), possible_moves[6].to);
+        assert_eq!((0, 2), possible_moves[7].to);
+        assert_eq!((0, 1), possible_moves[8].to);
+        assert_eq!((0, 0), possible_moves[9].to);
+        assert_eq!((0, 4), possible_moves[10].to);
+        assert_eq!((0, 5), possible_moves[11].to);
+        assert_eq!((0, 6), possible_moves[12].to);
+        assert_eq!((0, 7), possible_moves[13].to);
+        assert_eq!((1, 2), possible_moves[14].to);
+        assert_eq!((2, 1), possible_moves[15].to);
+        assert_eq!((3, 0), possible_moves[16].to);
+        assert_eq!((1, 4), possible_moves[17].to);
+        assert_eq!((2, 5), possible_moves[18].to);
+        assert_eq!((3, 6), possible_moves[19].to);
+        assert_eq!((4, 7), possible_moves[20].to);
+
+        // Available movements for Queen at d1
+        possible_moves = board.generate_queen_moves(pos_from_str("d1").unwrap());
+        assert_eq!(21, possible_moves.len());
+        assert_eq!((6, 3), possible_moves[0].to);
+        assert_eq!((5, 3), possible_moves[1].to);
+        assert_eq!((4, 3), possible_moves[2].to);
+        assert_eq!((3, 3), possible_moves[3].to);
+        assert_eq!((2, 3), possible_moves[4].to);
+        assert_eq!((1, 3), possible_moves[5].to);
+        assert_eq!((0, 3), possible_moves[6].to);
+        assert_eq!((7, 2), possible_moves[7].to);
+        assert_eq!((7, 1), possible_moves[8].to);
+        assert_eq!((7, 0), possible_moves[9].to);
+        assert_eq!((7, 4), possible_moves[10].to);
+        assert_eq!((7, 5), possible_moves[11].to);
+        assert_eq!((7, 6), possible_moves[12].to);
+        assert_eq!((7, 7), possible_moves[13].to);
+        assert_eq!((6, 2), possible_moves[14].to);
+        assert_eq!((5, 1), possible_moves[15].to);
+        assert_eq!((4, 0), possible_moves[16].to);
+        assert_eq!((6, 4), possible_moves[17].to);
+        assert_eq!((5, 5), possible_moves[18].to);
+        assert_eq!((4, 6), possible_moves[19].to);
+        assert_eq!((3, 7), possible_moves[20].to);
+    }
+
+    #[test]
+    fn test_generate_queen_moves_restricted() {
+        let board = ChessBoard::from_str("8/8/2ppp3/2pQp3/2ppp3/8/8/8 w - - 0 0").unwrap();
+
+        // Available movements for Queen at d5
+        let possible_moves = board.generate_queen_moves(pos_from_str("d5").unwrap());
+        assert_eq!(8, possible_moves.len());
+        assert_eq!((2, 3), possible_moves[0].to);
+        assert_eq!((4, 3), possible_moves[1].to);
+        assert_eq!((3, 2), possible_moves[2].to);
+        assert_eq!((3, 4), possible_moves[3].to);
+        assert_eq!((2, 2), possible_moves[4].to);
+        assert_eq!((2, 4), possible_moves[5].to);
+        assert_eq!((4, 2), possible_moves[6].to);
+        assert_eq!((4, 4), possible_moves[7].to);
     }
 }

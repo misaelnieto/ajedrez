@@ -17,7 +17,8 @@ pub enum ParseError {
     UselessMove,
 }
 
-pub const BOARD_SIZE: usize = 8; // Chessboard is 8x8
+pub const BOARD_SIZE: usize = 8;
+// Chessboard is 8x8
 pub const BOARD_SIZE_RANGE_0: Range<usize> = 0..BOARD_SIZE;
 const BOARD_SIZE_RANGE_1: RangeInclusive<usize> = 1..=BOARD_SIZE;
 const RANK_BASE_U8: u8 = '1' as u8;
@@ -219,11 +220,32 @@ pub struct ChessBoard {
 
 
 /// Converts a chess rank to a zero-based index
-pub fn rank_to_index(rank: usize) -> usize{
+pub fn rank_to_index(rank: usize) -> usize {
     match BOARD_SIZE_RANGE_1.contains(&rank) {
         true => BOARD_SIZE - rank,
         false => panic!("Rank must be a number between 1 and 8, you provided {rank}")
     }
+}
+
+/// Converts a position in algebraic notation into a tuple of 2 usize, suitable for indexing
+/// squares/pieces on the `ChessBoard.squares`
+///
+pub fn pos_from_str(s: &str) -> Result<(usize, usize), ParseError> {
+    let sb = s.as_bytes();
+    if s.len() != 2 {
+        return Err(ParseError::StringTooShort);
+    }
+
+    if !FILE_USIZE_RANGE.contains(&(sb[0] as usize)) {
+        return Err(ParseError::InvalidPositionFile);
+    }
+    if !RANK_UNICODE_USIZE_RANGE.contains(&(sb[1] as usize)) {
+        return Err(ParseError::InvalidPositionRank);
+    }
+    Ok((
+        BOARD_SIZE - 1 - (sb[1] - RANK_BASE_U8) as usize,
+        (sb[0] - FILE_BASE_U8) as usize,
+    ))
 }
 
 
@@ -249,7 +271,7 @@ pub struct Move {
 }
 
 #[derive(Debug, PartialEq, Eq)]
-pub enum ChessMoveError{
+pub enum ChessMoveError {
     OutOfBounds,
     StartPieceMissing,
     NotImplemented,
@@ -261,17 +283,17 @@ impl FromStr for Move {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let sb = s.as_bytes();
         if s.len() != 4 {
-            return Err(ParseError::StringTooShort)
+            return Err(ParseError::StringTooShort);
         }
 
         if !FILE_USIZE_RANGE.contains(&(sb[0] as usize)) || !FILE_USIZE_RANGE.contains(&(sb[2] as usize)) {
-            return Err(ParseError::InvalidPositionFile)
+            return Err(ParseError::InvalidPositionFile);
         }
         if !RANK_UNICODE_USIZE_RANGE.contains(&(sb[1] as usize)) || !RANK_UNICODE_USIZE_RANGE.contains(&(sb[3] as usize)) {
-            return Err(ParseError::InvalidPositionRank)
+            return Err(ParseError::InvalidPositionRank);
         }
 
-        let mov = Move{
+        let mov = Move {
             from: (
                 BOARD_SIZE - 1 - (sb[1] - RANK_BASE_U8) as usize,
                 (sb[0] - FILE_BASE_U8) as usize,
@@ -279,10 +301,10 @@ impl FromStr for Move {
             to: (
                 BOARD_SIZE - 1 - (sb[3] - RANK_BASE_U8) as usize,
                 (sb[2] - FILE_BASE_U8) as usize,
-            )
+            ),
         };
         if mov.from == mov.to {
-            return Err(ParseError::UselessMove)
+            return Err(ParseError::UselessMove);
         }
         Ok(mov)
     }
@@ -405,7 +427,7 @@ impl ChessBoard {
         }
 
         // Determine the direction depending on the pawn's color
-        let mut direction:isize = if pawn.color == Color::White { -1 } else { 1 };
+        let mut direction: isize = if pawn.color == Color::White { -1 } else { 1 };
 
         // Can only move forward within the RANK range
         let mut fwd = (x as isize + direction) as usize;
@@ -433,8 +455,8 @@ impl ChessBoard {
         // Make sure to check the pawn is in the initial position and
         // there's no piece two squares ahead.
         let initial_position = match pawn.color {
-            Color::White => {x == 6},
-            Color::Black => {x == 1}
+            Color::White => { x == 6 }
+            Color::Black => { x == 1 }
         };
         if initial_position {
             direction *= 2;
@@ -481,7 +503,7 @@ impl ChessBoard {
             }
 
             // Verify that the square is either empty or occupied by an opponent's piece
-            let dest_square:Square = self.squares[new_x as usize][new_y as usize];
+            let dest_square: Square = self.squares[new_x as usize][new_y as usize];
             if dest_square.is_empty() || dest_square.piece.unwrap().color != knight.color {
                 moves.push(Move { from: position, to: (new_x as usize, new_y as usize) });
             }
@@ -612,8 +634,8 @@ impl ChessBoard {
         // Offsets for the eight possible moves a king can make
         let move_offsets = [
             (-1, -1), (0, -1), (1, -1),
-            (-1,  0),          (1,  0),
-            (-1,  1), (0,  1), (1,  1),
+            (-1, 0), (1, 0),
+            (-1, 1), (0, 1), (1, 1),
         ];
 
         for &(dx, dy) in &move_offsets {
@@ -644,6 +666,61 @@ impl ChessBoard {
         moves
     }
 
+    pub fn generate_queen_moves(&self, position: (usize, usize)) -> Vec<Move> {
+        let mut moves = Vec::new();
+
+        let queen = match self.squares[position.0][position.1].piece {
+            Some(p) => p,
+            None => return moves, // No queen, so no moves.
+        };
+
+        // Ensure that the piece is a queen
+        if queen.piece_type != PieceType::Queen {
+            return moves; // Not a queen, so no moves.
+        }
+
+        // Directions combining both rook and bishop moves (horizontal, vertical, diagonal)
+        let directions = [
+            // Horizontal and vertical like a rook
+            (-1, 0), (1, 0), (0, -1), (0, 1),
+            // Diagonals like a bishop
+            (-1, -1), (-1, 1), (1, -1), (1, 1),
+        ];
+
+
+        for &(dx, dy) in directions.iter() {
+            let (mut x, mut y) = position;
+
+            loop {
+                x = (x as isize).wrapping_add(dx) as usize;
+                y = (y as isize).wrapping_add(dy) as usize;
+
+                // Break loop if out of bounds
+                if x >= BOARD_SIZE || y >= BOARD_SIZE {
+                    break;
+                }
+
+                match self.squares[x][y].piece {
+                    Some(piece) => {
+                        // If a piece is found on the path
+                        if piece.color != queen.color {
+                            // If the piece is of opposite color, it can be captured
+                            moves.push(Move { from: position, to: (x, y) });
+                        }
+                        // Since a piece is on this square, the queen cannot move past; break the loop
+                        break;
+                    }
+                    None => {
+                        // No piece on the square, the queen can move here
+                        moves.push(Move { from: position, to: (x, y) });
+                    }
+                }
+            }
+        }
+
+        moves
+    }
+
     pub fn generate_moves(&self, position: (usize, usize)) -> Result<Vec<Move>, ChessMoveError> {
         if self.squares[position.0][position.1].is_empty() {
             return Err(ChessMoveError::StartPieceMissing);
@@ -654,7 +731,7 @@ impl ChessBoard {
             PieceType::Bishop => Ok(self.generate_bishop_moves(position)),
             PieceType::Rook => Ok(self.generate_rook_moves(position)),
             PieceType::King => Ok(self.generate_king_moves(position)),
-            _ => Err(ChessMoveError::NotImplemented)
+            PieceType::Queen => Ok(self.generate_queen_moves(position)),
         }
     }
 
@@ -753,7 +830,7 @@ impl FromStr for ChessBoard {
                         for _ in file_iter.by_ref().take(c.to_digit(10).unwrap() as usize - 1) {}
                     }
                     '/' => {
-                        rank -=1;
+                        rank -= 1;
                         file_iter = FILE_CHAR_RANGE.cycle();
                     }
                     _ => {}
