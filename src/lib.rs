@@ -1,3 +1,4 @@
+use std::collections::BTreeSet;
 use std::fmt;
 use std::ops::{Range, RangeInclusive};
 use std::str::FromStr;
@@ -274,7 +275,6 @@ pub struct Move {
 pub enum ChessMoveError {
     OutOfBounds,
     StartPieceMissing,
-    NotImplemented,
 }
 
 impl FromStr for Move {
@@ -411,7 +411,7 @@ impl ChessBoard {
     }
 
     // Moves system
-    pub fn generate_pawn_moves(&self, position: (usize, usize)) -> Vec<Move> {
+    pub fn generate_intrinsic_pawn_moves(&self, position: (usize, usize)) -> Vec<Move> {
         let mut moves = Vec::new();
         let (x, y) = position;
 
@@ -470,7 +470,7 @@ impl ChessBoard {
         moves
     }
 
-    pub fn generate_knight_moves(&self, position: (usize, usize)) -> Vec<Move> {
+    pub fn generate_intrinsic_knight_moves(&self, position: (usize, usize)) -> Vec<Move> {
         let (x, y) = position;
         let mut moves = Vec::new();
 
@@ -512,8 +512,7 @@ impl ChessBoard {
         moves
     }
 
-
-    pub fn generate_bishop_moves(&self, position: (usize, usize)) -> Vec<Move> {
+    pub fn generate_intrinsic_bishop_moves(&self, position: (usize, usize)) -> Vec<Move> {
         let mut moves = Vec::new();
         // Get the bishop at the current position
         let bishop = match self.squares[position.0][position.1].piece {
@@ -569,8 +568,7 @@ impl ChessBoard {
         moves
     }
 
-
-    pub fn generate_rook_moves(&self, position: (usize, usize)) -> Vec<Move> {
+    pub fn generate_intrinsic_rook_moves(&self, position: (usize, usize)) -> Vec<Move> {
         let (mut x, mut y) = position;
         let mut moves = Vec::new();
 
@@ -620,7 +618,9 @@ impl ChessBoard {
         moves
     }
 
-    pub fn generate_king_moves(&self, position: (usize, usize)) -> Vec<Move> {
+    /// This function generates the King's moves with 3 constraints: Chess board boundaries,
+    /// piece color/capture, and empty squares.
+    pub fn generate_intrinsic_king_moves(&self, position: (usize, usize)) -> Vec<Move> {
         let mut moves = Vec::new();
         let king = match self.squares[position.0][position.1].piece {
             Some(p) => p,
@@ -631,6 +631,8 @@ impl ChessBoard {
         if king.piece_type != PieceType::King {
             return moves; // Not a king, so no moves.
         }
+
+        // The king cannot
         // Offsets for the eight possible moves a king can make
         let move_offsets = [
             (-1, -1), (0, -1), (1, -1),
@@ -666,7 +668,7 @@ impl ChessBoard {
         moves
     }
 
-    pub fn generate_queen_moves(&self, position: (usize, usize)) -> Vec<Move> {
+    pub fn generate_intrinsic_queen_moves(&self, position: (usize, usize)) -> Vec<Move> {
         let mut moves = Vec::new();
 
         let queen = match self.squares[position.0][position.1].piece {
@@ -721,20 +723,113 @@ impl ChessBoard {
         moves
     }
 
-    pub fn generate_moves(&self, position: (usize, usize)) -> Result<Vec<Move>, ChessMoveError> {
-        if self.squares[position.0][position.1].is_empty() {
-            return Err(ChessMoveError::StartPieceMissing);
-        }
+    /// Generates the set of possible moves for a given position with the most basic constraints.
+    pub fn generate_intrinsic_moves(&self, position: (usize, usize)) -> Vec<Move> {
         match self.squares[position.0][position.1].piece.unwrap().piece_type {
-            PieceType::Pawn => Ok(self.generate_pawn_moves(position)),
-            PieceType::Knight => Ok(self.generate_knight_moves(position)),
-            PieceType::Bishop => Ok(self.generate_bishop_moves(position)),
-            PieceType::Rook => Ok(self.generate_rook_moves(position)),
-            PieceType::King => Ok(self.generate_king_moves(position)),
-            PieceType::Queen => Ok(self.generate_queen_moves(position)),
+            PieceType::Pawn => self.generate_intrinsic_pawn_moves(position),
+            PieceType::Knight => self.generate_intrinsic_knight_moves(position),
+            PieceType::Bishop => self.generate_intrinsic_bishop_moves(position),
+            PieceType::Rook => self.generate_intrinsic_rook_moves(position),
+            PieceType::King => self.generate_intrinsic_king_moves(position),
+            PieceType::Queen => self.generate_intrinsic_queen_moves(position),
         }
     }
 
+    /// Returns a set of all targeted squares by all the pieces of the provided color
+    pub fn targeted_squares(&self, color: Color) -> BTreeSet<(usize, usize)> {
+        let mut squares = BTreeSet::new();
+        // Loop over all squares of the board to find opponent pieces
+        for i in 0..BOARD_SIZE {
+            for j in 0..BOARD_SIZE {
+                if let Some(piece) = self.squares[i][j].piece {
+                    // If it's an opponent's piece
+                    if piece.color != color {
+                        // Generate moves for this piece
+                        for m in self.generate_intrinsic_moves((i, j)) {
+                            // A move that directly targets king's position
+                            // or a move that targets the boundaries of the king
+                            squares.insert(m.to);
+                        }
+                    }
+                }
+            }
+        }
+        squares
+    }
+
+    pub fn find_king(&self, king_color: Color) -> Option<(i32, i32)> {
+        // Find the king's position
+        for i in 0..BOARD_SIZE {
+            for j in 0..BOARD_SIZE {
+                if let Some(piece) = self.squares[i][j].piece {
+                    if piece.color == king_color && piece.piece_type == PieceType::King {
+                        Some((i, j));
+                    }
+                }
+            }
+        }
+        None
+    }
+
+    /// Generates a set of King moves, i.e. intrinsic moves minus the squares where the king can be
+    /// captured. If the resulting set is empty, we can conclude the king is in full check mate and
+    /// the game is over.
+    pub fn generate_constrained_king_moves(&mut self, position: (usize, usize)) -> Vec<Move> {
+        let mut moves = Vec::new();
+        if let Some(king) = self.squares[position.0][position.1].piece {
+            // Ensure that the piece is a king
+            if king.piece_type == PieceType::King {
+                let intrinsic = self.generate_intrinsic_king_moves(position)
+                    .iter()
+                    .map(|mov| mov.to)
+                    .collect::<BTreeSet<(usize, usize)>>();
+                let targeted = self.targeted_squares(if king.color == Color::White {Color::Black} else {Color::Black});
+                let constrained = intrinsic.difference(&targeted)
+                    .cloned()
+                    .collect::<Vec<(usize, usize)>>();
+                for pos in constrained {
+                    moves.push(Move { from: position, to: pos });
+                }
+
+                // if we still have moves left, remove the ones that would set the king into checkmate
+                let moves_copy = moves.clone();
+                moves.clear();
+                if moves_copy.len() > 0 {
+                    for m in moves_copy {
+                        // Move the king to the new possible position
+                        self.squares[m.from.0][m.from.1].piece = None;
+                        self.squares[m.to.0][m.to.1].piece = Some(king);
+
+                        // If the king is not in check, it is a good move
+                        let targeted = self.targeted_squares(if king.color == Color::White {Color::Black} else {Color::Black});
+                        if !targeted.contains(&position) {
+                            moves.push(m);
+                        }
+                        // Return the king to it's original position
+                        self.squares[m.to.0][m.to.1].piece = None;
+                        self.squares[m.from.0][m.from.1].piece = Some(king);
+                    }
+                }
+            }
+        }
+
+        moves
+    }
+
+    /// A function that determines if the king is in check at the current position
+    pub fn is_king_in_check(&self, position: (usize, usize)) -> bool {
+        if let Some(king) = self.squares[position.0][position.1].piece {
+            // Ensure that the piece is a king
+            if king.piece_type == PieceType::King {
+                let targeted = self.targeted_squares(if king.color == Color::White {Color::Black} else {Color::Black});
+                return targeted.contains(&position);
+            }
+        }
+        false // The king is not in check.
+    }
+
+
+    /// Moves the piece and increments the movements counter
     pub fn move_piece(&mut self, mov: Move) -> Result<(), ChessMoveError> {
         let (from_x, from_y) = mov.from;
         let (to_x, to_y) = mov.to;
@@ -745,7 +840,7 @@ impl ChessBoard {
         }
 
         // Retrieve the piece from the starting square
-        let piece = match self.squares[from_x][from_y].piece {
+        let mut piece = match self.squares[from_x][from_y].piece {
             Some(piece) => piece,
             None => return Err(ChessMoveError::StartPieceMissing),
         };
@@ -753,6 +848,7 @@ impl ChessBoard {
         // Remove the piece from the starting square
         self.squares[from_x][from_y].piece = None;
         self.squares[from_x][from_y].piece = Some(piece);
+        piece.moves += 1;
 
         Ok(())
     }

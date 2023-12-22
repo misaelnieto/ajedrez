@@ -2,7 +2,7 @@
 mod tests {
     use std::str::FromStr;
 
-    use ajedrez::{ChessBoard, Move, ParseError, BOARD_SIZE_RANGE_0, pos_from_str};
+    use ajedrez::{BOARD_SIZE_RANGE_0, ChessBoard, Move, ParseError, pos_from_str};
 
     #[test]
     fn test_move_from_str() {
@@ -31,21 +31,21 @@ mod tests {
         // Fail gracefully: empty moves for anything else but pawns
         for i in [0, 2, 3, 4, 5, 7] {
             for j in 0..=7 {
-                let possible_moves = board.generate_pawn_moves((i, j));
+                let possible_moves = board.generate_intrinsic_pawn_moves((i, j));
                 assert_eq!(0, possible_moves.len());
             }
         }
 
         // On first move, every pawn has two options
         for i in 0..=7 {
-            let mut possible_moves = board.generate_pawn_moves((1, i));
+            let mut possible_moves = board.generate_intrinsic_pawn_moves((1, i));
             assert_eq!(2, possible_moves.len());
             assert_eq!((1, i), possible_moves[0].from);
             assert_eq!((2, i), possible_moves[0].to);
             assert_eq!((1, i), possible_moves[1].from);
             assert_eq!((3, i), possible_moves[1].to);
 
-            possible_moves = board.generate_pawn_moves((6, i));
+            possible_moves = board.generate_intrinsic_pawn_moves((6, i));
             assert_eq!(2, possible_moves.len());
             assert_eq!((6, i), possible_moves[0].from);
             assert_eq!((5, i), possible_moves[0].to);
@@ -60,7 +60,7 @@ mod tests {
         let mut board = ChessBoard::from_str("8/8/2rbk3/3P4/8/8/8/8 w - - 0 0").unwrap();
         // The pawn may capture either the rook or the knight, but not the bishop, which blocks
         // the pawn from moving directly forward. So only 2 moves
-        let possible_moves = board.generate_pawn_moves((3, 3));
+        let possible_moves = board.generate_intrinsic_pawn_moves((3, 3));
         assert_eq!(2, possible_moves.len());
         // The pawn may capture either the rook ...
         assert_eq!((2, 2), possible_moves[0].to);
@@ -69,7 +69,7 @@ mod tests {
 
         // Black pawn
         board = ChessBoard::from_str("8/8/8/8/3p4/2RBK3/8/8 w - - 0 0").unwrap();
-        let possible_moves = board.generate_pawn_moves((4, 3));
+        let possible_moves = board.generate_intrinsic_pawn_moves((4, 3));
         assert_eq!(2, possible_moves.len());
         assert_eq!((5, 2), possible_moves[0].to);
         assert_eq!((5, 4), possible_moves[1].to);
@@ -86,35 +86,35 @@ mod tests {
                 if default_knight_positions.contains(&(i, j)) {
                     continue;
                 }
-                let possible_moves = board.generate_knight_moves((i, j));
+                let possible_moves = board.generate_intrinsic_knight_moves((i, j));
                 assert_eq!(0, possible_moves.len());
             }
         }
 
         // Default movements for Knight at b8
         let pos = default_knight_positions[0];
-        let possible_moves = board.generate_knight_moves(pos);
+        let possible_moves = board.generate_intrinsic_knight_moves(pos);
         assert_eq!(2, possible_moves.len());
         assert_eq!((2, 2), possible_moves[0].to);
         assert_eq!((2, 0), possible_moves[1].to);
 
         // Default movements for Knight at g8
         let pos = default_knight_positions[1];
-        let possible_moves = board.generate_knight_moves(pos);
+        let possible_moves = board.generate_intrinsic_knight_moves(pos);
         assert_eq!(2, possible_moves.len());
         assert_eq!((2, 7), possible_moves[0].to);
         assert_eq!((2, 5), possible_moves[1].to);
 
         // Default movements for Knight at b1
         let pos = default_knight_positions[2];
-        let possible_moves = board.generate_knight_moves(pos);
+        let possible_moves = board.generate_intrinsic_knight_moves(pos);
         assert_eq!(2, possible_moves.len());
         assert_eq!((5, 2), possible_moves[0].to);
         assert_eq!((5, 0), possible_moves[1].to);
 
         // Default movements for Knight at b8
         let pos = default_knight_positions[3];
-        let possible_moves = board.generate_knight_moves(pos);
+        let possible_moves = board.generate_intrinsic_knight_moves(pos);
         assert_eq!(2, possible_moves.len());
         assert_eq!((5, 7), possible_moves[0].to);
         assert_eq!((5, 5), possible_moves[1].to);
@@ -125,14 +125,14 @@ mod tests {
         let board = ChessBoard::from_str("1n6/8/8/8/8/5N2/8/8 b KQkq - 0 1").unwrap();
 
         // Black horse only has 3 possible moves ...
-        let mut possible_moves = board.generate_knight_moves((0, 1));
+        let mut possible_moves = board.generate_intrinsic_knight_moves((0, 1));
         assert_eq!(3, possible_moves.len());
         assert_eq!((1, 3), possible_moves[0].to);
         assert_eq!((2, 2), possible_moves[1].to);
         assert_eq!((2, 0), possible_moves[2].to);
 
 
-        possible_moves = board.generate_knight_moves((5, 5));
+        possible_moves = board.generate_intrinsic_knight_moves((5, 5));
         // ... while the White horse has all 8 possible moves
         assert_eq!(8, possible_moves.len());
         assert_eq!((6, 7), possible_moves[0].to);
@@ -152,7 +152,7 @@ mod tests {
         // Fail gracefully: On this initial setup, bishops cannot move at all
         for i in BOARD_SIZE_RANGE_0 {
             for j in BOARD_SIZE_RANGE_0 {
-                let possible_moves = board.generate_bishop_moves((i, j));
+                let possible_moves = board.generate_intrinsic_bishop_moves((i, j));
                 assert_eq!(0, possible_moves.len());
             }
         }
@@ -164,7 +164,7 @@ mod tests {
         let default_bishop_positions = [(0, 2), (0, 5), (7, 2), (7, 5)];
 
         // Default movements for Knight at c8
-        let mut possible_moves = board.generate_bishop_moves(default_bishop_positions[0]);
+        let mut possible_moves = board.generate_intrinsic_bishop_moves(default_bishop_positions[0]);
         assert_eq!(7, possible_moves.len());
         assert_eq!((1, 1), possible_moves[0].to);
         assert_eq!((2, 0), possible_moves[1].to);
@@ -174,7 +174,7 @@ mod tests {
         assert_eq!((5, 7), possible_moves[6].to);
 
         // Default movements for Knight at f8
-        possible_moves = board.generate_bishop_moves(default_bishop_positions[1]);
+        possible_moves = board.generate_intrinsic_bishop_moves(default_bishop_positions[1]);
         assert_eq!(7, possible_moves.len());
         assert_eq!((1, 4), possible_moves[0].to);
         assert_eq!((2, 3), possible_moves[1].to);
@@ -184,7 +184,7 @@ mod tests {
         assert_eq!((2, 7), possible_moves[6].to);
 
         // Default movements for Knight at c8
-        possible_moves = board.generate_bishop_moves(default_bishop_positions[2]);
+        possible_moves = board.generate_intrinsic_bishop_moves(default_bishop_positions[2]);
         assert_eq!(7, possible_moves.len());
         assert_eq!((6, 1), possible_moves[0].to);
         assert_eq!((5, 0), possible_moves[1].to);
@@ -194,7 +194,7 @@ mod tests {
         assert_eq!((2, 7), possible_moves[6].to);
 
         // Default movements for Knight at c8
-        possible_moves = board.generate_bishop_moves(default_bishop_positions[3]);
+        possible_moves = board.generate_intrinsic_bishop_moves(default_bishop_positions[3]);
         assert_eq!(7, possible_moves.len());
         assert_eq!((6, 4), possible_moves[0].to);
         assert_eq!((5, 3), possible_moves[1].to);
@@ -209,7 +209,7 @@ mod tests {
         let board = ChessBoard::from_str("8/3p4/8/5B2/3b4/8/2P5/8 w - - 0 0").unwrap();
 
         // Available movements for Bishop at d4
-        let mut possible_moves = board.generate_bishop_moves((4, 3));
+        let mut possible_moves = board.generate_intrinsic_bishop_moves((4, 3));
         assert_eq!(13, possible_moves.len());
         assert_eq!((3, 2), possible_moves[0].to);
         assert_eq!((2, 1), possible_moves[1].to);
@@ -225,7 +225,7 @@ mod tests {
         assert_eq!((7, 6), possible_moves[12].to);
 
         // Available movements for Bishop at f5
-        possible_moves = board.generate_bishop_moves((3, 5));
+        possible_moves = board.generate_intrinsic_bishop_moves((3, 5));
         assert_eq!(8, possible_moves.len());
         assert_eq!((2, 4), possible_moves[0].to);
         assert_eq!((1, 3), possible_moves[1].to);
@@ -244,7 +244,7 @@ mod tests {
         // Fail gracefully: On this initial setup, rooks cannot move at all
         for i in BOARD_SIZE_RANGE_0 {
             for j in BOARD_SIZE_RANGE_0 {
-                let possible_moves = board.generate_rook_moves((i, j));
+                let possible_moves = board.generate_intrinsic_rook_moves((i, j));
                 assert_eq!(0, possible_moves.len());
             }
         }
@@ -256,7 +256,7 @@ mod tests {
         let board = ChessBoard::from_str("8/4P1r1/8/6p1/3R4/8/8/8 w - - 0 0").unwrap();
 
         // Available movements for Rook at g7, 4 to empty squares and 1 capture (e7)
-        let mut possible_moves = board.generate_rook_moves((1, 6));
+        let mut possible_moves = board.generate_intrinsic_rook_moves((1, 6));
         assert_eq!(5, possible_moves.len());
         assert_eq!((0, 6), possible_moves[0].to);
         assert_eq!((2, 6), possible_moves[1].to);
@@ -265,7 +265,7 @@ mod tests {
         assert_eq!((1, 7), possible_moves[4].to);
 
         // Available movements for Rook at d4
-        possible_moves = board.generate_rook_moves((4, 3));
+        possible_moves = board.generate_intrinsic_rook_moves((4, 3));
         assert_eq!(14, possible_moves.len());
         assert_eq!((3, 3), possible_moves[0].to);
         assert_eq!((2, 3), possible_moves[1].to);
@@ -288,7 +288,7 @@ mod tests {
         // and the rest of the pieces will not generate moves for generate_king_moves
         for i in BOARD_SIZE_RANGE_0 {
             for j in BOARD_SIZE_RANGE_0 {
-                let possible_moves = board.generate_king_moves((i, j));
+                let possible_moves = board.generate_intrinsic_king_moves((i, j));
                 assert_eq!(0, possible_moves.len());
             }
         }
@@ -299,7 +299,7 @@ mod tests {
         let board = ChessBoard::from_str("4k3/8/8/8/8/8/8/4K3 w - - 0 0").unwrap();
 
         // Available movements for King at e8, 4 to empty squares and 1 capture (e7)
-        let mut possible_moves = board.generate_king_moves((0, 4));
+        let mut possible_moves = board.generate_intrinsic_king_moves((0, 4));
         assert_eq!(5, possible_moves.len());
         assert_eq!((0, 3), possible_moves[0].to);
         assert_eq!((1, 3), possible_moves[1].to);
@@ -308,7 +308,7 @@ mod tests {
         assert_eq!((1, 5), possible_moves[4].to);
 
         // Available movements for King at e1
-        possible_moves = board.generate_king_moves((7, 4));
+        possible_moves = board.generate_intrinsic_king_moves((7, 4));
         assert_eq!(5, possible_moves.len());
         assert_eq!((6, 3), possible_moves[0].to);
         assert_eq!((7, 3), possible_moves[1].to);
@@ -320,12 +320,21 @@ mod tests {
     #[test]
     fn test_generate_king_moves_checkmate() {
         // Example board taken from wikipedia, a king checkmate
-        let board = ChessBoard::from_str("5r2/7q/6N1/8/1P1k4/5Q2/B7/3R2K1 w - - 0 0").unwrap();
+        let mut board = ChessBoard::from_str("5r2/7q/6N1/8/1P1k4/5Q2/B7/3R2K1 w - - 0 0").unwrap();
+        let kings_pos = pos_from_str("d4").unwrap();
 
-        // Available movements for King at d4 are zero
-        let possible_moves = board.generate_king_moves((4, 3));
-        assert_eq!(0, possible_moves.len());
+        // The black king at d4 is in checkmate by the white rook at d1
+        assert!(board.is_king_in_check(kings_pos));
+
+        // Intrinsic moves for King are 8
+        let mut possible_moves = board.generate_intrinsic_king_moves((4, 3));
+        assert_eq!(possible_moves.len(), 8);
+
+        // But in reality, the king is in checkmate and the game is over
+        possible_moves = board.generate_constrained_king_moves(kings_pos);
+        assert_eq!(possible_moves.len(), 0);
     }
+
 
     #[test]
     fn test_generate_queen_moves_initial() {
@@ -335,7 +344,7 @@ mod tests {
         // and the rest of the pieces will not generate moves for generate_queen_moves()
         for i in BOARD_SIZE_RANGE_0 {
             for j in BOARD_SIZE_RANGE_0 {
-                let possible_moves = board.generate_queen_moves((i, j));
+                let possible_moves = board.generate_intrinsic_queen_moves((i, j));
                 assert_eq!(0, possible_moves.len());
             }
         }
@@ -346,7 +355,7 @@ mod tests {
         let board = ChessBoard::from_str("3q4/8/8/8/8/8/8/3Q4 b - - 0 0").unwrap();
 
         // Available movements for Queen at d8
-        let mut possible_moves = board.generate_queen_moves(pos_from_str("d8").unwrap());
+        let mut possible_moves = board.generate_intrinsic_queen_moves(pos_from_str("d8").unwrap());
         assert_eq!(21, possible_moves.len());
         assert_eq!((1, 3), possible_moves[0].to);
         assert_eq!((2, 3), possible_moves[1].to);
@@ -371,7 +380,7 @@ mod tests {
         assert_eq!((4, 7), possible_moves[20].to);
 
         // Available movements for Queen at d1
-        possible_moves = board.generate_queen_moves(pos_from_str("d1").unwrap());
+        possible_moves = board.generate_intrinsic_queen_moves(pos_from_str("d1").unwrap());
         assert_eq!(21, possible_moves.len());
         assert_eq!((6, 3), possible_moves[0].to);
         assert_eq!((5, 3), possible_moves[1].to);
@@ -401,7 +410,7 @@ mod tests {
         let board = ChessBoard::from_str("8/8/2ppp3/2pQp3/2ppp3/8/8/8 w - - 0 0").unwrap();
 
         // Available movements for Queen at d5
-        let possible_moves = board.generate_queen_moves(pos_from_str("d5").unwrap());
+        let possible_moves = board.generate_intrinsic_queen_moves(pos_from_str("d5").unwrap());
         assert_eq!(8, possible_moves.len());
         assert_eq!((2, 3), possible_moves[0].to);
         assert_eq!((4, 3), possible_moves[1].to);
