@@ -335,6 +335,21 @@ mod tests {
         assert_eq!(possible_moves.len(), 0);
     }
 
+    #[test]
+    fn test_castling_kingside() {
+        // Example board taken from wikipedia, Castling
+        let board = ChessBoard::from_str("r3k2r/8/8/8/8/8/8/R3K2R w - - 0 0").unwrap();
+        assert!(board.can_castle_kingside(pos_from_str("e8").unwrap()));
+        assert!(board.can_castle_kingside(pos_from_str("e1").unwrap()));
+    }
+
+    #[test]
+    fn test_castling_queenside() {
+        // Example board taken from wikipedia, Castling
+        let board = ChessBoard::from_str("r3k2r/8/8/8/8/8/8/R3K2R w - - 0 0").unwrap();
+        assert!(board.can_castle_queenside(pos_from_str("e8").unwrap()));
+        assert!(board.can_castle_queenside(pos_from_str("e1").unwrap()));
+    }
 
     #[test]
     fn test_generate_queen_moves_initial() {

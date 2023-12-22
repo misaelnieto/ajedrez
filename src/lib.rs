@@ -4,8 +4,10 @@ use std::ops::{Range, RangeInclusive};
 use std::str::FromStr;
 
 use regex::{Regex, RegexBuilder};
+use crate::Color::{Black, White};
 
 use crate::ParseError::EmptyString;
+use crate::PieceType::Rook;
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum ParseError {
@@ -35,6 +37,14 @@ pub enum Color {
     Black,
 }
 
+impl Color {
+    pub fn inverse(&self) -> Color {
+        match self {
+            White => Black,
+            Black => White
+        }
+    }
+}
 #[derive(Debug, PartialEq, Eq)]
 pub struct ParseColorError;
 
@@ -269,6 +279,14 @@ fn file_to_index(file: &char) -> usize {
 pub struct Move {
     pub from: (usize, usize),
     pub to: (usize, usize),
+    pub castling: bool,
+}
+
+impl Move {
+    /// The most usual way to create a move.
+    pub fn new(from: (usize, usize), to: (usize, usize)) -> Self {
+        Move { from, to, castling: false }
+    }
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -302,6 +320,7 @@ impl FromStr for Move {
                 BOARD_SIZE - 1 - (sb[3] - RANK_BASE_U8) as usize,
                 (sb[2] - FILE_BASE_U8) as usize,
             ),
+            castling: false,
         };
         if mov.from == mov.to {
             return Err(ParseError::UselessMove);
@@ -433,21 +452,21 @@ impl ChessBoard {
         let mut fwd = (x as isize + direction) as usize;
         if BOARD_SIZE_RANGE_0.contains(&fwd) {
             if self.squares[fwd][y].is_empty() {
-                moves.push(Move { from: position, to: (fwd, y) });
+                moves.push(Move { from: position, to: (fwd, y), castling: false });
             }
 
             // Capture diagonally, to the left, except for first file/column
             if (y as isize - 1) > 0 {
                 let left = y - 1;
                 if BOARD_SIZE_RANGE_0.contains(&left) && !self.squares[fwd][left].is_empty() {
-                    moves.push(Move { from: position, to: (fwd, left) });
+                    moves.push(Move { from: position, to: (fwd, left), castling: false });
                 }
             }
 
             // Capture diagonally, to the right, except for last file/column
             let right = y + 1;
             if BOARD_SIZE_RANGE_0.contains(&right) && !self.squares[fwd][right].is_empty() {
-                moves.push(Move { from: position, to: (fwd, right) });
+                moves.push(Move { from: position, to: (fwd, right), castling: false });
             }
         }
 
@@ -462,7 +481,7 @@ impl ChessBoard {
             direction *= 2;
             fwd = (x as isize + direction) as usize;
             if self.squares[x][y].piece.unwrap().moves == 0 && self.squares[fwd][y].is_empty() {
-                moves.push(Move { from: position, to: (fwd, y) });
+                moves.push(Move { from: position, to: (fwd, y), castling: false });
             }
         }
 
@@ -505,7 +524,7 @@ impl ChessBoard {
             // Verify that the square is either empty or occupied by an opponent's piece
             let dest_square: Square = self.squares[new_x as usize][new_y as usize];
             if dest_square.is_empty() || dest_square.piece.unwrap().color != knight.color {
-                moves.push(Move { from: position, to: (new_x as usize, new_y as usize) });
+                moves.push(Move { from: position, to: (new_x as usize, new_y as usize), castling: false });
             }
         }
 
@@ -550,6 +569,7 @@ impl ChessBoard {
                             moves.push(Move {
                                 from: position,
                                 to: current_position,
+                                castling: false,
                             });
                         }
                         break; // Stop moving in this direction whether a piece was captured or it's blocked
@@ -559,6 +579,7 @@ impl ChessBoard {
                         moves.push(Move {
                             from: position,
                             to: current_position,
+                            castling: false,
                         });
                     }
                 }
@@ -602,14 +623,14 @@ impl ChessBoard {
                     Some(piece) => {
                         // If there's a piece of the opposite color, it can be captured
                         if piece.color != rook.color {
-                            moves.push(Move { from: position, to: (x, y) });
+                            moves.push(Move { from: position, to: (x, y), castling: false });
                         }
                         // Whether it's a capture or not, the rook can't move past this piece
                         break;
                     }
                     None => {
                         // Add the move to the list if the square is empty
-                        moves.push(Move { from: position, to: (x, y) });
+                        moves.push(Move { from: position, to: (x, y), castling: false });
                     }
                 }
             }
@@ -650,13 +671,13 @@ impl ChessBoard {
                     Some(piece) => {
                         // If the square is occupied by an opponent's piece, it's a capture move
                         if piece.color != king.color {
-                            moves.push(Move { from: position, to: (new_x as usize, new_y as usize) });
+                            moves.push(Move { from: position, to: (new_x as usize, new_y as usize), castling: false });
                         }
                         // Otherwise, the king cannot move into a square occupied by an allied piece
                     }
                     None => {
                         // If the square is unoccupied, it's a valid move
-                        moves.push(Move { from: position, to: (new_x as usize, new_y as usize) });
+                        moves.push(Move { from: position, to: (new_x as usize, new_y as usize), castling: false });
                     }
                 }
             }
@@ -707,14 +728,14 @@ impl ChessBoard {
                         // If a piece is found on the path
                         if piece.color != queen.color {
                             // If the piece is of opposite color, it can be captured
-                            moves.push(Move { from: position, to: (x, y) });
+                            moves.push(Move { from: position, to: (x, y), castling: false });
                         }
                         // Since a piece is on this square, the queen cannot move past; break the loop
                         break;
                     }
                     None => {
                         // No piece on the square, the queen can move here
-                        moves.push(Move { from: position, to: (x, y) });
+                        moves.push(Move { from: position, to: (x, y), castling: false });
                     }
                 }
             }
@@ -742,8 +763,7 @@ impl ChessBoard {
         for i in 0..BOARD_SIZE {
             for j in 0..BOARD_SIZE {
                 if let Some(piece) = self.squares[i][j].piece {
-                    // If it's an opponent's piece
-                    if piece.color != color {
+                    if piece.color == color {
                         // Generate moves for this piece
                         for m in self.generate_intrinsic_moves((i, j)) {
                             // A move that directly targets king's position
@@ -783,12 +803,12 @@ impl ChessBoard {
                     .iter()
                     .map(|mov| mov.to)
                     .collect::<BTreeSet<(usize, usize)>>();
-                let targeted = self.targeted_squares(if king.color == Color::White {Color::Black} else {Color::Black});
+                let targeted = self.targeted_squares(if king.color == Color::White { Color::Black } else { Color::Black });
                 let constrained = intrinsic.difference(&targeted)
                     .cloned()
                     .collect::<Vec<(usize, usize)>>();
                 for pos in constrained {
-                    moves.push(Move { from: position, to: pos });
+                    moves.push(Move { from: position, to: pos, castling: false });
                 }
 
                 // if we still have moves left, remove the ones that would set the king into checkmate
@@ -801,7 +821,7 @@ impl ChessBoard {
                         self.squares[m.to.0][m.to.1].piece = Some(king);
 
                         // If the king is not in check, it is a good move
-                        let targeted = self.targeted_squares(if king.color == Color::White {Color::Black} else {Color::Black});
+                        let targeted = self.targeted_squares(if king.color == Color::White { Color::Black } else { Color::Black });
                         if !targeted.contains(&position) {
                             moves.push(m);
                         }
@@ -809,6 +829,21 @@ impl ChessBoard {
                         self.squares[m.to.0][m.to.1].piece = None;
                         self.squares[m.from.0][m.from.1].piece = Some(king);
                     }
+                }
+
+                if self.can_castle_kingside(position) {
+                    moves.push(Move{
+                        from: position,
+                        to: (position.0, 6),
+                        castling: true
+                    })
+                }
+                if self.can_castle_queenside(position) {
+                    moves.push(Move{
+                        from: position,
+                        to: (position.0, 2),
+                        castling: true
+                    })
                 }
             }
         }
@@ -821,13 +856,70 @@ impl ChessBoard {
         if let Some(king) = self.squares[position.0][position.1].piece {
             // Ensure that the piece is a king
             if king.piece_type == PieceType::King {
-                let targeted = self.targeted_squares(if king.color == Color::White {Color::Black} else {Color::Black});
+                let targeted = self.targeted_squares(king.color.inverse());
                 return targeted.contains(&position);
             }
         }
         false // The king is not in check.
     }
 
+    /// Analyzes the board to tell if the king at the given position can castle kingside
+    pub fn can_castle_kingside(&self, king_position: (usize, usize)) -> bool {
+        let (x, y) = king_position;
+        if y != 4 {
+            return false
+        }
+
+        if let (Some(king), Some(rook)) = (self.squares[x][y].piece, self.squares[x][7].piece) {
+            let targeted = self.targeted_squares(king.color.inverse());
+            // Ensure that the pieces are the right type ...
+            return king.piece_type == PieceType::King && rook.piece_type == Rook
+                // .. and color
+                && rook.color == king.color
+                // ... the king and the kingside rook haven't moved
+                && king.moves == 0 && rook.moves == 0
+                // ... the squares between them are empty,
+                && self.squares[x][6].is_empty()
+                && self.squares[x][5].is_empty()
+                // ... the king isn't in check,
+                && !targeted.contains(&king_position)
+                //  ... doesn't move through check,
+                && !targeted.contains(&(x, 5))
+                // ... and isn't castling into check.
+                && !targeted.contains(&(x, 6))
+        }
+        false
+    }
+
+    /// Analyzes the board to tell if the king at the given position can castle kingside
+    pub fn can_castle_queenside(&self, king_position: (usize, usize)) -> bool {
+        let (x, y) = king_position;
+        if y != 4 {
+            return false
+        }
+
+        if let (Some(king), Some(rook)) = (self.squares[x][y].piece, self.squares[x][0].piece) {
+            let targeted = self.targeted_squares(king.color.inverse());
+            // Ensure that the pieces are the right type ...
+            return king.piece_type == PieceType::King && rook.piece_type == Rook
+                // .. and color
+                && rook.color == king.color
+                // ... the king and the kingside rook haven't moved
+                && king.moves == 0 && rook.moves == 0
+                // ... the squares between them are empty,
+                && self.squares[x][1].is_empty()
+                && self.squares[x][2].is_empty()
+                && self.squares[x][3].is_empty()
+                // ... the king isn't in check,
+                && !targeted.contains(&king_position)
+                //  ... doesn't move through check,
+                && !targeted.contains(&(x, 1))
+                && !targeted.contains(&(x, 3))
+                // ... and isn't castling into check.
+                && !targeted.contains(&(x, 2))
+        }
+        false
+    }
 
     /// Moves the piece and increments the movements counter
     pub fn move_piece(&mut self, mov: Move) -> Result<(), ChessMoveError> {
