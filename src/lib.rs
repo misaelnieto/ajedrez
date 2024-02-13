@@ -3,11 +3,15 @@ use std::fmt;
 use std::ops::{Range, RangeInclusive};
 use std::str::FromStr;
 
+use colored::Colorize;
 use regex::{Regex, RegexBuilder};
-use crate::Color::{Black, White};
 
+use crate::Color::{Black, White};
 use crate::ParseError::EmptyString;
-use crate::PieceType::Rook;
+pub use crate::pgn::PGNGame;
+use crate::PieceType::{Bishop, King, Knight, Pawn, Queen, Rook};
+
+mod pgn;
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum ParseError {
@@ -45,6 +49,7 @@ impl Color {
         }
     }
 }
+
 #[derive(Debug, PartialEq, Eq)]
 pub struct ParseColorError;
 
@@ -134,6 +139,21 @@ impl Piece {
             }
         }
     }
+
+    pub fn new_from_algebraic(color: Color, p: &str) -> Self {
+        Piece {
+            color,
+            moves: 0,
+            piece_type: match p {
+                "K" => King,
+                "Q" => Queen,
+                "R" => Rook,
+                "B" => Bishop,
+                "N" => Knight,
+                _ => Pawn,
+            },
+        }
+    }
 }
 
 
@@ -183,11 +203,26 @@ impl Square {
         self.piece.is_none()
     }
 
+    /// Check whether the current square has a piece of this type
+    pub fn is(&self, piece_type: PieceType) -> bool {
+        self.piece.is_some() && self.piece.unwrap().piece_type == piece_type
+    }
+
+    /// Check whether the piece on the current square has not moved
+    pub fn has_not_moved(&self) -> bool {
+        self.piece.is_some() && self.piece.unwrap().moves == 0
+    }
+
+
     pub fn as_fen(&self) -> char {
         match self.piece {
             Some(_) => self.piece.unwrap().as_fen(),
             None => ' ',
         }
+    }
+
+    pub fn to_zero_based_index(&self) -> (usize, usize) {
+        (self.rank - 1, self.file.file_to_zero_base_index().unwrap())
     }
 }
 
@@ -227,6 +262,9 @@ pub struct ChessBoard {
     /// square is noted here. It's recorded using algebraic notation (e.g., "e3").
     /// If there's no en passant target square, this is represented by a dash "-".
     pub passant_square: Option<Square>,
+
+    /// Highlight specific squares. Useful for printing.
+    highlighted: Vec<Square>,
 }
 
 
@@ -235,6 +273,80 @@ pub fn rank_to_index(rank: usize) -> usize {
     match BOARD_SIZE_RANGE_1.contains(&rank) {
         true => BOARD_SIZE - rank,
         false => panic!("Rank must be a number between 1 and 8, you provided {rank}")
+    }
+}
+
+/// Converts a chess file to a zero-based index
+fn c_file_to_index(file: &char) -> usize {
+    match file {
+        'a' => 0,
+        'b' => 1,
+        'c' => 2,
+        'd' => 3,
+        'e' => 4,
+        'f' => 5,
+        'g' => 6,
+        'h' => 7,
+        _ => panic!("File must be a letter between a and h, you provided {file}"),
+    }
+}
+
+trait File2Index {
+    fn file_to_zero_base_index(&self) -> Result<usize, String>;
+}
+
+impl File2Index for char {
+    fn file_to_zero_base_index(&self) -> Result<usize, String> {
+        match self {
+            'a' => Ok(0),
+            'b' => Ok(1),
+            'c' => Ok(2),
+            'd' => Ok(3),
+            'e' => Ok(4),
+            'f' => Ok(5),
+            'g' => Ok(6),
+            'h' => Ok(7),
+            _ => Err(format!("File must be a letter between a and h, you provided {}", self)),
+        }
+    }
+}
+
+impl File2Index for str {
+    fn file_to_zero_base_index(&self) -> Result<usize, String> {
+        self.chars()
+            .next()
+            .expect("File should have at least one character")
+            .file_to_zero_base_index()
+    }
+}
+
+trait Rank2Index {
+    fn rank_to_zero_base_index(&self) -> Result<usize, String>;
+}
+
+
+impl Rank2Index for char {
+    fn rank_to_zero_base_index(&self) -> Result<usize, String> {
+        match self {
+            '1' => Ok(0),
+            '2' => Ok(1),
+            '3' => Ok(2),
+            '4' => Ok(3),
+            '5' => Ok(4),
+            '6' => Ok(5),
+            '7' => Ok(6),
+            '8' => Ok(7),
+            _ => Err(format!("Rank must be a digit between 1 and 8, you provided {}", self)),
+        }
+    }
+}
+
+impl Rank2Index for str {
+    fn rank_to_zero_base_index(&self) -> Result<usize, String> {
+        self.chars()
+            .next()
+            .expect("Rank should have at least one character")
+            .rank_to_zero_base_index()
     }
 }
 
@@ -260,21 +372,6 @@ pub fn pos_from_str(s: &str) -> Result<(usize, usize), ParseError> {
 }
 
 
-/// Converts a chess file to a zero-based index
-fn file_to_index(file: &char) -> usize {
-    match file {
-        'a' => 0,
-        'b' => 1,
-        'c' => 2,
-        'd' => 3,
-        'e' => 4,
-        'f' => 5,
-        'g' => 6,
-        'h' => 7,
-        _ => panic!("File must be a letter between a and h, you provided {file}"),
-    }
-}
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Move {
     pub from: (usize, usize),
@@ -289,10 +386,18 @@ impl Move {
     }
 }
 
+pub enum ChessMove {
+    Simple,
+    CastleKingside,
+    CastleQueenside,
+}
+
+
 #[derive(Debug, PartialEq, Eq)]
 pub enum ChessMoveError {
     OutOfBounds,
     StartPieceMissing,
+    CastlingForbidden,
 }
 
 impl FromStr for Move {
@@ -338,18 +443,18 @@ impl ChessBoard {
                 squares[i][j] = Square { piece: None, rank, file };
             }
         }
-        ChessBoard { squares, active_color: Color::White, full_moves: 0, half_moves: 0, passant_square: None }
+        ChessBoard { squares, active_color: Color::White, full_moves: 0, half_moves: 0, passant_square: None, highlighted: vec![] }
     }
 
     pub fn set_piece(&mut self, rank: usize, file: &char, color: Color, piece_type: PieceType) -> &mut ChessBoard {
         let index_rank = rank_to_index(rank);
-        let index_file = file_to_index(file);
+        let index_file = c_file_to_index(file);
         self.squares[index_rank][index_file].piece = Some(Piece::new(color, piece_type));
         self
     }
 
-    pub fn get_piece(&self, rank: usize, file: &char) -> Option<Piece> {
-        self.squares[rank_to_index(rank)][file_to_index(file)].piece
+    pub fn get_piece(&self, rank: usize, file: usize) -> Option<Piece> {
+        self.squares[rank][file].piece
     }
 
     /*
@@ -377,19 +482,36 @@ impl ChessBoard {
         }
     }
 
-    pub fn print_board(&self) {
-        print!("╭{}╮\n", "─".repeat(BOARD_SIZE * 4 - 1));
-        for rank in 0..BOARD_SIZE {
-            print!("│");
-            for file in 0..BOARD_SIZE {
-                match self.squares[rank][file].piece {
-                    Some(piece) => print!(" {} │", piece),
-                    None => print!("   │"),
-                }
+    /// Returns a ascii-art like string representation of the current state of the board.
+    pub fn as_str(&mut self) -> String {
+        let mut b = String::from("");
+        b.push_str("    a   b   c   d   e   f   g   h\n");
+        b.push_str("  ┌───┬───┬───┬───┬───┬───┬───┬───┐\n");
+        for row in BOARD_SIZE_RANGE_0 {
+            b.push_str(&*format!("{} │", row));
+            for col in BOARD_SIZE_RANGE_0 {
+                let token = match self.squares[row][col].piece {
+                    Some(piece) => piece.to_string(),
+                    None => " ".to_string(),
+                    };
+                let highlight_current = self.highlighted.iter()
+                    .position(|s| s == &self.squares[row][col])
+                    .map(|e| self.highlighted.remove(e))
+                    .is_some();
+                if highlight_current {
+                    b.push_str(&*format!(" {} │", token.black().on_yellow()));
+                } else {
+                    b.push_str(&*format!(" {} │", token));
+                };
             }
-            print!("\n├{}┤\n", "─".repeat(BOARD_SIZE * 4 - 1));
+            b.push_str(&*format!(" {}\n", BOARD_SIZE - row));
+            if row < 7 {
+                b.push_str("  ├───┼───┼───┼───┼───┼───┼───┼───┤\n")
+            }
         }
-        print!("╰{}╯\n", "─".repeat(BOARD_SIZE * 4 - 1));
+        b.push_str("  └───┴───┴───┴───┴───┴───┴───┴───┘\n");
+        b.push_str("    0   1   2   3   4   5   6   7\n");
+        b
     }
 
     pub fn as_fen(&self) -> String {
@@ -756,6 +878,25 @@ impl ChessBoard {
         }
     }
 
+    pub fn infer_move(&self, to_position: (usize, usize), piece_type: PieceType) -> Option<Move> {
+        // Loop over all squares of the board to find opponent pieces
+        for i in 0..BOARD_SIZE {
+            for j in 0..BOARD_SIZE {
+                if let Some(piece) = self.squares[i][j].piece {
+                    if piece.color == self.active_color && piece.piece_type == piece_type {
+                        // Generate moves for this piece
+                        for m in self.generate_intrinsic_moves((i, j)) {
+                            if m.to == to_position {
+                                return Some(m);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        None
+    }
+
     /// Returns a set of all targeted squares by all the pieces of the provided color
     pub fn targeted_squares(&self, color: Color) -> BTreeSet<(usize, usize)> {
         let mut squares = BTreeSet::new();
@@ -777,6 +918,20 @@ impl ChessBoard {
         squares
     }
 
+    pub fn find_pieces(&self, piece_type: PieceType, color: Color) -> Vec<&Square> {
+        let mut squares: Vec<&Square> = Vec::new();
+        for i in 0..BOARD_SIZE {
+            for j in 0..BOARD_SIZE {
+                if let Some(piece) = self.squares[i][j].piece {
+                    if piece.color == color && piece.piece_type == piece_type {
+                        squares.push(&self.squares[i][j]);
+                    }
+                }
+            }
+        }
+        squares
+    }
+
     pub fn find_king(&self, king_color: Color) -> Option<(i32, i32)> {
         // Find the king's position
         for i in 0..BOARD_SIZE {
@@ -790,6 +945,7 @@ impl ChessBoard {
         }
         None
     }
+
 
     /// Generates a set of King moves, i.e. intrinsic moves minus the squares where the king can be
     /// captured. If the resulting set is empty, we can conclude the king is in full check mate and
@@ -832,17 +988,17 @@ impl ChessBoard {
                 }
 
                 if self.can_castle_kingside(position) {
-                    moves.push(Move{
+                    moves.push(Move {
                         from: position,
                         to: (position.0, 6),
-                        castling: true
+                        castling: true,
                     })
                 }
                 if self.can_castle_queenside(position) {
-                    moves.push(Move{
+                    moves.push(Move {
                         from: position,
                         to: (position.0, 2),
-                        castling: true
+                        castling: true,
                     })
                 }
             }
@@ -864,10 +1020,18 @@ impl ChessBoard {
     }
 
     /// Analyzes the board to tell if the king at the given position can castle kingside
+    ///
+    /// The rules for castling are:
+    ///
+    /// - Neither the king nor the chosen rook has previously moved during the game.
+    /// - There are no pieces between the king and the chosen rook.
+    /// - The king is not currently in check.
+    /// - The squares that the king passes over are not attacked by an enemy piece, nor is the square where the king lands.
+    /// - The king does not pass through a square that is attacked by an enemy piece.
     pub fn can_castle_kingside(&self, king_position: (usize, usize)) -> bool {
         let (x, y) = king_position;
         if y != 4 {
-            return false
+            return false;
         }
 
         if let (Some(king), Some(rook)) = (self.squares[x][y].piece, self.squares[x][7].piece) {
@@ -886,7 +1050,7 @@ impl ChessBoard {
                 //  ... doesn't move through check,
                 && !targeted.contains(&(x, 5))
                 // ... and isn't castling into check.
-                && !targeted.contains(&(x, 6))
+                && !targeted.contains(&(x, 6));
         }
         false
     }
@@ -895,7 +1059,7 @@ impl ChessBoard {
     pub fn can_castle_queenside(&self, king_position: (usize, usize)) -> bool {
         let (x, y) = king_position;
         if y != 4 {
-            return false
+            return false;
         }
 
         if let (Some(king), Some(rook)) = (self.squares[x][y].piece, self.squares[x][0].piece) {
@@ -916,13 +1080,13 @@ impl ChessBoard {
                 && !targeted.contains(&(x, 1))
                 && !targeted.contains(&(x, 3))
                 // ... and isn't castling into check.
-                && !targeted.contains(&(x, 2))
+                && !targeted.contains(&(x, 2));
         }
         false
     }
 
     /// Moves the piece and increments the movements counter
-    pub fn move_piece(&mut self, mov: Move) -> Result<(), ChessMoveError> {
+    pub fn move_piece(&mut self, mov: Move) -> Result<String, ChessMoveError> {
         let (from_x, from_y) = mov.from;
         let (to_x, to_y) = mov.to;
 
@@ -931,18 +1095,101 @@ impl ChessBoard {
             return Err(ChessMoveError::OutOfBounds);
         }
 
-        // Retrieve the piece from the starting square
-        let mut piece = match self.squares[from_x][from_y].piece {
-            Some(piece) => piece,
-            None => return Err(ChessMoveError::StartPieceMissing),
+
+        // Ensure the start piece is not missing
+        if self.squares[from_x][from_y].is_empty() {
+            return Err(ChessMoveError::StartPieceMissing);
+        }
+
+        // Do we have capture?
+        let action_str = if !self.squares[to_x][to_y].is_empty() {
+            format!("{:?} at ({}, {}) captures {:?} at ({}, {})",
+                    self.squares[from_x][from_y].piece.unwrap().piece_type, from_x, from_y,
+                    self.squares[to_x][to_y].piece.unwrap().piece_type, to_x, to_y
+            )
+        } else {
+            format!("{:?} at ({}, {}) moves to ({}, {})",
+                    self.squares[from_x][from_y].piece.unwrap().piece_type, from_x, from_y,
+                    to_x, to_y
+            )
         };
 
-        // Remove the piece from the starting square
+        // Now move the piece
+        self.squares[to_x][to_y].piece = self.squares[from_x][from_y].piece;
+        self.squares[to_x][to_y].piece.unwrap().moves += 1;
         self.squares[from_x][from_y].piece = None;
-        self.squares[from_x][from_y].piece = Some(piece);
-        piece.moves += 1;
 
-        Ok(())
+        if self.squares[to_x][to_y].piece.unwrap().color == White {
+            // Clear highlighted squares
+            self.highlighted.clear();
+        } else {
+            // Increment full move only after the black moves
+            self.full_moves += 1;
+        }
+
+        // Highlight the involved squares
+        self.highlighted.push(self.squares[from_x][from_y]);
+        self.highlighted.push(self.squares[to_x][to_y]);
+
+        Ok(action_str)
+    }
+
+    /// Performs castling, constrained by the rules described on `can_castle_kingside`
+    pub fn castle(&mut self, color: Color, castle_type: ChessMove) -> Result<String, ChessMoveError> {
+        let row = match color {
+            White => { 7 }
+            Black => { 0 }
+        };
+
+        let king_col = 4;
+        let nw_king_col: usize;
+        let rook_col: usize;
+        let nw_rook_col: usize;
+
+        match castle_type {
+            ChessMove::CastleKingside => {
+                nw_king_col = 6;
+                rook_col = 7;
+                nw_rook_col = 5;
+            },
+            ChessMove::CastleQueenside => {
+                nw_king_col = 2;
+                rook_col = 0;
+                nw_rook_col = 3;
+            },
+            _ => { return Err(ChessMoveError::CastlingForbidden); }
+        };
+
+        if self.can_castle_kingside((row, king_col)) {
+            let mut king = self.squares[row][king_col].piece.unwrap();
+            king.moves += 1;
+            let mut rook = self.squares[row][rook_col].piece.unwrap();
+            rook.moves += 1;
+            self.squares[row][king_col].piece = None;
+            self.squares[row][nw_king_col].piece = Some(king);
+            self.squares[row][rook_col].piece = None;
+            self.squares[row][nw_rook_col].piece = Some(rook);
+
+            if color == White {
+                // Clear highlighted squares
+                self.highlighted.clear();
+            } else {
+                self.full_moves += 1;
+            }
+
+            // Highlight the involved squares
+            self.highlighted.push(self.squares[row][king_col]);
+            self.highlighted.push(self.squares[row][nw_king_col]);
+            self.highlighted.push(self.squares[row][rook_col]);
+            self.highlighted.push(self.squares[row][nw_rook_col]);
+            return match castle_type {
+                ChessMove::CastleKingside => Ok("Castles kingside".parse().unwrap()),
+                ChessMove::CastleQueenside => Ok("Castles Queenside".parse().unwrap()),
+                _ => Err(ChessMoveError::CastlingForbidden)
+            };
+        }
+
+        Err(ChessMoveError::CastlingForbidden)
     }
 }
 
@@ -1039,7 +1286,7 @@ impl FromStr for ChessBoard {
                 _ => {
                     let p_file = passant.as_bytes()[0] as char;
                     let p_rank = passant.as_bytes()[1] as usize;
-                    Some(board.squares[rank_to_index(p_rank)][file_to_index(&p_file)])
+                    Some(board.squares[rank_to_index(p_rank)][c_file_to_index(&p_file)])
                 }
             };
             board.half_moves = *halfmove;

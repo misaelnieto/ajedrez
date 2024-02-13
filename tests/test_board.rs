@@ -3,7 +3,6 @@ mod tests {
     use std::str::FromStr;
 
     use ajedrez::{ChessBoard, Color, Piece, PieceType, Square};
-
     #[test]
     fn test_constructor() {
         let board = ChessBoard::new();

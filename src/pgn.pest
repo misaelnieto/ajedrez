@@ -1,0 +1,24 @@
+WHITESPACE = _{ " " | "\t" | "\r" | "\n" }
+metadata_block = { "[" ~ word ~ "\"" ~ word ~ "\"]" }
+word = { (!("]" | "\"") ~ ANY)+ }
+files = { 'a'..'h' }
+from_file = { 'a'..'h' }
+from_rank = { '1' .. '8' }
+to_file = { 'a'..'h' }
+to_rank = { '1' .. '8' }
+move_comment = { "{" ~ (!("}") ~ ANY)* ~ "}" }
+piece = { ("K" | "Q" | "R" | "B" | "N")? }
+promoted_ranks = { ( "1" | "8" )}
+promoted_piece = { ("Q" | "R" | "B" | "N")? }
+castle_kingside = { "O-O" }
+castle_queenside = { "O-O-O" }
+move_piece_without_capture = { piece ~ from_rank? ~ (to_file){1,2} ~ to_rank }
+move_piece_with_capture = { piece ~ from_file? ~ "x" ~ to_file ~ to_rank }
+move_pawn_promotion = {files ~ promoted_ranks ~ "=" ~ promoted_piece}
+move_pawn_promotion_with_capture = {files ~ "x" ~ files ~ promoted_ranks ~ "=" ~ promoted_piece}
+move_piece = { (move_pawn_promotion | move_pawn_promotion_with_capture | move_piece_with_capture | move_piece_without_capture)}
+complete_move = { (move_piece | castle_queenside | castle_kingside) ~ ("+" | "#")? }
+move_pair = { (ASCII_DIGIT)+ ~ "." ~ complete_move ~ move_comment? ~ ((ASCII_DIGIT)+ ~ "...")? ~ complete_move? ~ move_comment? }
+move_list = { (move_pair)+ }
+game_result = { "1/2-1/2" | "1-0" | "0-1" }
+game = { SOI ~ (metadata_block)* ~ move_list ~ game_result ~ EOI}

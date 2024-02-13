@@ -10,5 +10,5 @@ fn main() {
     board.set_piece(1, &'c', Color::Black, PieceType::Rook);
 
     // Example of printing the board state to the console
-    board.print_board();
+    println!("{}", board.as_str());
 }
