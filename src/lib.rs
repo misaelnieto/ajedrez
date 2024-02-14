@@ -7,11 +7,13 @@ use colored::Colorize;
 use regex::{Regex, RegexBuilder};
 
 use crate::Color::{Black, White};
+pub use crate::fen::{BoardAsFEN, FENStringParsing, INITIAL_FEN_BOARD};
 use crate::ParseError::EmptyString;
-pub use crate::pgn::PGNGame;
+pub use crate::pgn::{PGNGame, PieceMove};
 use crate::PieceType::{Bishop, King, Knight, Pawn, Queen, Rook};
 
 mod pgn;
+mod fen;
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum ParseError {
@@ -22,6 +24,7 @@ pub enum ParseError {
     InvalidPositionRank,
     InvalidPositionFile,
     UselessMove,
+    InvalidAlgebraicPosition,
 }
 
 pub const BOARD_SIZE: usize = 8;
@@ -109,7 +112,6 @@ pub struct Piece {
     pub moves: u32,
 }
 
-// For convenience, we can implement a constructor for the Piece struct
 impl Piece {
     pub fn new(color: Color, piece_type: PieceType) -> Self {
         Piece { color, piece_type, moves: 0 }
@@ -313,10 +315,7 @@ impl File2Index for char {
 
 impl File2Index for str {
     fn file_to_zero_base_index(&self) -> Result<usize, String> {
-        self.chars()
-            .next()
-            .expect("File should have at least one character")
-            .file_to_zero_base_index()
+        self.chars().next().expect("File should have at least one character").file_to_zero_base_index()
     }
 }
 
@@ -343,10 +342,7 @@ impl Rank2Index for char {
 
 impl Rank2Index for str {
     fn rank_to_zero_base_index(&self) -> Result<usize, String> {
-        self.chars()
-            .next()
-            .expect("Rank should have at least one character")
-            .rank_to_zero_base_index()
+        self.chars().next().expect("Rank should have at least one character").rank_to_zero_base_index()
     }
 }
 
@@ -453,21 +449,190 @@ impl ChessBoard {
         self
     }
 
-    pub fn get_piece(&self, rank: usize, file: usize) -> Option<Piece> {
-        self.squares[rank][file].piece
+    /// Sets the piece at the specified square using zero-based-index row and col
+    /// This method call can be chained like this:
+    ///
+    /// ```ignore
+    /// board.set_piece(...)
+    ///    .set_piece(...)
+    ///     .set_piece(...);
+    /// ```
+    pub fn set_piece_0(&mut self, row: usize, col: usize, piece: Option<Piece>) -> &mut ChessBoard {
+        self.squares[row][col].piece = piece;
+        self
     }
 
-    /*
-        This indicates the castling rights for both White and Black. It uses the following characters:
-        "K" if White can castle kingside.
-        "Q" if White can castle queenside.
-        "k" if Black can castle kingside.
-        "q" if Black can castle queenside.
-        A dash "-" indicates that neither side can castle.
-        Examples:
-        "KQkq"  indicates that both sides can castle on both sides.
-        "-" Neither side can castle
-    */
+    /// Gets the piece at the specified square using zero-based-index row and col
+    pub fn get_piece_0(&self, row: usize, col: usize) -> Option<Piece> {
+        self.squares[row][col].piece
+    }
+
+    /// Gets the piece at the specified square using algebraic notation
+    pub fn get_piece_a(&self, coordinate: &str) -> Option<Piece> {
+        match coordinate {
+            // File a
+            "a1" => self.squares[7][0].piece,
+            "a2" => self.squares[6][0].piece,
+            "a3" => self.squares[5][0].piece,
+            "a4" => self.squares[4][0].piece,
+            "a5" => self.squares[3][0].piece,
+            "a6" => self.squares[2][0].piece,
+            "a7" => self.squares[1][0].piece,
+            "a8" => self.squares[0][0].piece,
+            // file b
+            "b1" => self.squares[7][1].piece,
+            "b2" => self.squares[6][1].piece,
+            "b3" => self.squares[5][1].piece,
+            "b4" => self.squares[4][1].piece,
+            "b5" => self.squares[3][1].piece,
+            "b6" => self.squares[2][1].piece,
+            "b7" => self.squares[1][1].piece,
+            "b8" => self.squares[0][1].piece,
+            // File c
+            "c1" => self.squares[7][2].piece,
+            "c2" => self.squares[6][2].piece,
+            "c3" => self.squares[5][2].piece,
+            "c4" => self.squares[4][2].piece,
+            "c5" => self.squares[3][2].piece,
+            "c6" => self.squares[2][2].piece,
+            "c7" => self.squares[1][2].piece,
+            "c8" => self.squares[0][2].piece,
+            // File d
+            "d1" => self.squares[7][3].piece,
+            "d2" => self.squares[6][3].piece,
+            "d3" => self.squares[5][3].piece,
+            "d4" => self.squares[4][3].piece,
+            "d5" => self.squares[3][3].piece,
+            "d6" => self.squares[2][3].piece,
+            "d7" => self.squares[1][3].piece,
+            "d8" => self.squares[0][3].piece,
+            // File e
+            "e1" => self.squares[7][4].piece,
+            "e2" => self.squares[6][4].piece,
+            "e3" => self.squares[5][4].piece,
+            "e4" => self.squares[4][4].piece,
+            "e5" => self.squares[3][4].piece,
+            "e6" => self.squares[2][4].piece,
+            "e7" => self.squares[1][4].piece,
+            "e8" => self.squares[0][4].piece,
+            // File F
+            "f1" => self.squares[7][5].piece,
+            "f2" => self.squares[6][5].piece,
+            "f3" => self.squares[5][5].piece,
+            "f4" => self.squares[4][5].piece,
+            "f5" => self.squares[3][5].piece,
+            "f6" => self.squares[2][5].piece,
+            "f7" => self.squares[1][5].piece,
+            "f8" => self.squares[0][5].piece,
+            // File h
+            "g1" => self.squares[7][6].piece,
+            "g2" => self.squares[6][6].piece,
+            "g3" => self.squares[5][6].piece,
+            "g4" => self.squares[4][6].piece,
+            "g5" => self.squares[3][6].piece,
+            "g6" => self.squares[2][6].piece,
+            "g7" => self.squares[1][6].piece,
+            "g8" => self.squares[0][6].piece,
+            // File h
+            "h1" => self.squares[7][7].piece,
+            "h2" => self.squares[6][7].piece,
+            "h3" => self.squares[5][7].piece,
+            "h4" => self.squares[4][7].piece,
+            "h5" => self.squares[3][7].piece,
+            "h6" => self.squares[2][7].piece,
+            "h7" => self.squares[1][7].piece,
+            "h8" => self.squares[0][7].piece,
+            _ => None
+        }
+    }
+
+    pub fn get_square_a(&self, coordinate: &str) -> Option<Square> {
+        match coordinate {
+            // File a
+            "a1" => Some(self.squares[7][0]),
+            "a2" => Some(self.squares[6][0]),
+            "a3" => Some(self.squares[5][0]),
+            "a4" => Some(self.squares[4][0]),
+            "a5" => Some(self.squares[3][0]),
+            "a6" => Some(self.squares[2][0]),
+            "a7" => Some(self.squares[1][0]),
+            "a8" => Some(self.squares[0][0]),
+            // file b
+            "b1" => Some(self.squares[7][1]),
+            "b2" => Some(self.squares[6][1]),
+            "b3" => Some(self.squares[5][1]),
+            "b4" => Some(self.squares[4][1]),
+            "b5" => Some(self.squares[3][1]),
+            "b6" => Some(self.squares[2][1]),
+            "b7" => Some(self.squares[1][1]),
+            "b8" => Some(self.squares[0][1]),
+            // File c
+            "c1" => Some(self.squares[7][2]),
+            "c2" => Some(self.squares[6][2]),
+            "c3" => Some(self.squares[5][2]),
+            "c4" => Some(self.squares[4][2]),
+            "c5" => Some(self.squares[3][2]),
+            "c6" => Some(self.squares[2][2]),
+            "c7" => Some(self.squares[1][2]),
+            "c8" => Some(self.squares[0][2]),
+            // File d
+            "d1" => Some(self.squares[7][3]),
+            "d2" => Some(self.squares[6][3]),
+            "d3" => Some(self.squares[5][3]),
+            "d4" => Some(self.squares[4][3]),
+            "d5" => Some(self.squares[3][3]),
+            "d6" => Some(self.squares[2][3]),
+            "d7" => Some(self.squares[1][3]),
+            "d8" => Some(self.squares[0][3]),
+            // File e
+            "e1" => Some(self.squares[7][4]),
+            "e2" => Some(self.squares[6][4]),
+            "e3" => Some(self.squares[5][4]),
+            "e4" => Some(self.squares[4][4]),
+            "e5" => Some(self.squares[3][4]),
+            "e6" => Some(self.squares[2][4]),
+            "e7" => Some(self.squares[1][4]),
+            "e8" => Some(self.squares[0][4]),
+            // File f
+            "f1" => Some(self.squares[7][5]),
+            "f2" => Some(self.squares[6][5]),
+            "f3" => Some(self.squares[5][5]),
+            "f4" => Some(self.squares[4][5]),
+            "f5" => Some(self.squares[3][5]),
+            "f6" => Some(self.squares[2][5]),
+            "f7" => Some(self.squares[1][5]),
+            "f8" => Some(self.squares[0][5]),
+            // File g
+            "g1" => Some(self.squares[7][6]),
+            "g2" => Some(self.squares[6][6]),
+            "g3" => Some(self.squares[5][6]),
+            "g4" => Some(self.squares[4][6]),
+            "g5" => Some(self.squares[3][6]),
+            "g6" => Some(self.squares[2][6]),
+            "g7" => Some(self.squares[1][6]),
+            "g8" => Some(self.squares[0][6]),
+            // File h
+            "h1" => Some(self.squares[7][7]),
+            "h2" => Some(self.squares[6][7]),
+            "h3" => Some(self.squares[5][7]),
+            "h4" => Some(self.squares[4][7]),
+            "h5" => Some(self.squares[3][7]),
+            "h6" => Some(self.squares[2][7]),
+            "h7" => Some(self.squares[1][7]),
+            "h8" => Some(self.squares[0][7]),
+            _ => None
+        }
+    }
+
+    // This indicates the castling rights for both White and Black. It uses the following characters:
+    // "K" if White can castle kingside.
+    // "Q" if White can castle queenside.
+    // "k" if Black can castle kingside.
+    // "q" if Black can castle queenside.
+    // A dash "-" indicates that neither side can castle.
+    // Examples:
+    // "KQkq"  indicates that both sides can castle on both sides.
+    // "-" Neither side can castle
     pub fn get_castling(&self) -> Vec<Piece> {
         vec![]
     }
@@ -493,11 +658,8 @@ impl ChessBoard {
                 let token = match self.squares[row][col].piece {
                     Some(piece) => piece.to_string(),
                     None => " ".to_string(),
-                    };
-                let highlight_current = self.highlighted.iter()
-                    .position(|s| s == &self.squares[row][col])
-                    .map(|e| self.highlighted.remove(e))
-                    .is_some();
+                };
+                let highlight_current = self.highlighted.iter().position(|s| s == &self.squares[row][col]).map(|e| self.highlighted.remove(e)).is_some();
                 if highlight_current {
                     b.push_str(&*format!(" {} │", token.black().on_yellow()));
                 } else {
@@ -512,43 +674,6 @@ impl ChessBoard {
         b.push_str("  └───┴───┴───┴───┴───┴───┴───┴───┘\n");
         b.push_str("    0   1   2   3   4   5   6   7\n");
         b
-    }
-
-    pub fn as_fen(&self) -> String {
-        let mut fen_code = String::new();
-        for rank in 0..BOARD_SIZE {
-            let mut empty_squares = 0;
-            for file in 0..BOARD_SIZE {
-                let square = self.squares[rank][file];
-                if square.is_empty() {
-                    empty_squares += 1;
-                    continue;
-                }
-                if empty_squares > 0 {
-                    fen_code.push(char::from_digit(empty_squares, 10).unwrap());
-                    empty_squares = 0;
-                }
-                fen_code.push(square.as_fen())
-            }
-            if empty_squares > 0 {
-                fen_code.push(char::from_digit(empty_squares, 10).unwrap());
-            }
-            if rank < BOARD_SIZE - 1 {
-                fen_code.push('/');
-            }
-        }
-        fen_code.push_str(
-            &*format!(" {} {} {} {} {}",
-                      self.active_color,
-                      self.get_castling_as_string(),
-                      match self.passant_square {
-                          None => '-',
-                          Some(_) => self.passant_square.unwrap().as_fen()
-                      },
-                      self.half_moves,
-                      self.full_moves)
-        );
-        fen_code
     }
 
     // Moves system
@@ -638,8 +763,7 @@ impl ChessBoard {
             let new_y = y as isize + dy;
 
             // Verify the move is within the bounds of the board
-            if !(new_x >= 0 && new_x < BOARD_SIZE as isize &&
-                new_y >= 0 && new_y < BOARD_SIZE as isize) {
+            if !(new_x >= 0 && new_x < BOARD_SIZE as isize && new_y >= 0 && new_y < BOARD_SIZE as isize) {
                 continue;
             }
 
@@ -955,14 +1079,9 @@ impl ChessBoard {
         if let Some(king) = self.squares[position.0][position.1].piece {
             // Ensure that the piece is a king
             if king.piece_type == PieceType::King {
-                let intrinsic = self.generate_intrinsic_king_moves(position)
-                    .iter()
-                    .map(|mov| mov.to)
-                    .collect::<BTreeSet<(usize, usize)>>();
+                let intrinsic = self.generate_intrinsic_king_moves(position).iter().map(|mov| mov.to).collect::<BTreeSet<(usize, usize)>>();
                 let targeted = self.targeted_squares(if king.color == Color::White { Color::Black } else { Color::Black });
-                let constrained = intrinsic.difference(&targeted)
-                    .cloned()
-                    .collect::<Vec<(usize, usize)>>();
+                let constrained = intrinsic.difference(&targeted).cloned().collect::<Vec<(usize, usize)>>();
                 for pos in constrained {
                     moves.push(Move { from: position, to: pos, castling: false });
                 }
@@ -1066,7 +1185,7 @@ impl ChessBoard {
             let targeted = self.targeted_squares(king.color.inverse());
             // Ensure that the pieces are the right type ...
             return king.piece_type == PieceType::King && rook.piece_type == Rook
-                // .. and color
+                // ... and color
                 && rook.color == king.color
                 // ... the king and the kingside rook haven't moved
                 && king.moves == 0 && rook.moves == 0
@@ -1151,12 +1270,12 @@ impl ChessBoard {
                 nw_king_col = 6;
                 rook_col = 7;
                 nw_rook_col = 5;
-            },
+            }
             ChessMove::CastleQueenside => {
                 nw_king_col = 2;
                 rook_col = 0;
                 nw_rook_col = 3;
-            },
+            }
             _ => { return Err(ChessMoveError::CastlingForbidden); }
         };
 
@@ -1199,10 +1318,7 @@ impl FromStr for ChessBoard {
     fn from_str(s: &str) -> Result<Self, ParseError> {
         if s.is_empty() { return Err(EmptyString); }
         fn from_fen_str(representation: &str) -> Result<ChessBoard, ParseError> {
-            let re: Regex = RegexBuilder::new(FEN_REGEX)
-                .case_insensitive(true)
-                .build()
-                .unwrap();
+            let re: Regex = RegexBuilder::new(FEN_REGEX).case_insensitive(true).build().unwrap();
 
             if !re.is_match(representation) {
                 return Err(ParseError::InvalidFENString);

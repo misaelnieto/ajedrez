@@ -6,14 +6,12 @@ use pest::Parser;
 use pest_derive::Parser;
 
 use crate::{ChessBoard, ChessMove, ChessMoveError, Color, File2Index, Move, PieceType, Rank2Index, rank_to_index};
+use crate::fen::INITIAL_FEN_BOARD;
 use crate::PieceType::{Bishop, King, Knight, Pawn, Queen, Rook};
 
 #[derive(Parser)]
 #[grammar = "pgn.pest"]
-pub struct PGNParser;
-
-
-const INITIAL_FEN_BOARD: &str = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w - - 0 0";
+struct PGNParser;
 
 pub struct PieceMove<'a> {
     piece: PieceType,
@@ -84,7 +82,6 @@ pub struct PGNGame<'a> {
     game_result: String,
     moves: Vec<Pair<'a, Rule>>,
 }
-
 
 impl<'a> PGNGame<'a> {
     pub fn new(pgn_str: &'a str) -> Option<PGNGame<'a>> {
@@ -162,6 +159,7 @@ impl<'a> PGNGame<'a> {
         }
         Ok(log_str)
     }
+
     pub fn process_complete_move(&mut self, move_ix: usize, player_color: Color, full_move: &Pair<Rule>) -> Result<String, ChessMoveError> {
         let move_or_castle = full_move.clone().into_inner().next().expect("Unexpected empty rule pair");
         match move_or_castle.as_rule() {
