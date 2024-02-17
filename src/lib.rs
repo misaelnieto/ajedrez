@@ -4,11 +4,10 @@ use std::ops::{Range, RangeInclusive};
 use std::str::FromStr;
 
 use colored::Colorize;
-use regex::{Regex, RegexBuilder};
 
+use crate::ChessMove::CastleQueenside;
 use crate::Color::{Black, White};
 pub use crate::fen::{BoardAsFEN, FENStringParsing, INITIAL_FEN_BOARD};
-use crate::ParseError::EmptyString;
 pub use crate::pgn::{PGNGame, PieceMove};
 use crate::PieceType::{Bishop, King, Knight, Pawn, Queen, Rook};
 
@@ -36,6 +35,9 @@ const FILE_BASE_U8: u8 = 'a' as u8;
 const RANK_UNICODE_USIZE_RANGE: RangeInclusive<usize> = 49..=56;
 const FILE_USIZE_RANGE: RangeInclusive<usize> = 97..=104;
 const FILE_CHAR_RANGE: RangeInclusive<char> = 'a'..='h';
+pub const DEFAULT_KING_COL: usize = 4;
+pub const DEFAULT_KINGSIDE_ROOK_COL: usize = 7;
+pub const DEFAULT_QUEENSIDE_ROOK_COL: usize = 0;
 
 /// The two different colors for the pieces
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
@@ -193,6 +195,12 @@ impl PartialEq for Piece {
     }
 }
 
+
+/// A Square in the board that can contain a [Piece]
+///
+/// A board is a collection of 64([BOARD_SIZE]) Squares. Each Square knows it's location on the board and comes with a
+/// few convenience methods. See below.
+///
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct Square {
     pub piece: Option<Piece>,
@@ -201,21 +209,73 @@ pub struct Square {
 }
 
 impl Square {
+
+    /// A convenience helper to let you know if the square is empty.
+    /// ```
+    /// use ajedrez::Square;
+    /// let s = Square {piece: None, rank: 1, file: 'a'};
+    /// assert!(s.is_empty());
+    /// ```
     pub fn is_empty(&self) -> bool {
         self.piece.is_none()
     }
 
+    /// A convenience helper to let you know if the square is not empty.
+    /// Note: Use `is()` If you want to know the actual piece contained in this square.
+    /// ```
+    /// use ajedrez::PieceType::Rook;
+    /// use ajedrez::{Piece, Square};
+    /// use ajedrez::Color::White;
+    /// let s = Square {piece: Some(Piece::new(White, Rook)), rank: 1, file: 'a'};
+    /// assert!(s.is_not_empty());
+    /// ```
+    pub fn is_not_empty(&self) -> bool {
+        self.piece.is_some()
+    }
+
     /// Check whether the current square has a piece of this type
+    ///
+    /// ```
+    /// use ajedrez::PieceType::{King, Rook};
+    /// use ajedrez::{Piece, Square};
+    /// use ajedrez::Color::White;
+    /// let s = Square {piece: Some(Piece::new(White, Rook)), rank: 1, file: 'a'};
+    /// assert!(s.is(Rook));
+    /// assert!(!s.is(King))
+    /// ```
     pub fn is(&self, piece_type: PieceType) -> bool {
         self.piece.is_some() && self.piece.unwrap().piece_type == piece_type
     }
 
     /// Check whether the piece on the current square has not moved
+    ///
+    /// ```
+    /// use ajedrez::PieceType::Rook;
+    /// use ajedrez::{Piece, Square};
+    /// use ajedrez::Color::White;
+    /// let mut s = Square {
+    ///     piece: Some(Piece{color: White, piece_type: Rook, moves:0}),
+    ///     rank: 1,
+    ///     file: 'a'
+    /// };
+    /// assert!(s.has_not_moved());
+    /// s.piece.as_mut().unwrap().moves = 1;  // Simulate the piece was moved
+    /// assert!(!s.has_not_moved());
+    /// ```
     pub fn has_not_moved(&self) -> bool {
         self.piece.is_some() && self.piece.unwrap().moves == 0
     }
 
-
+    /// Returns a FEN representation (a single char) of the contained piece,
+    /// or a space (maybe not a very good idea ... IDK yet).
+    ///
+    /// ```
+    /// use ajedrez::PieceType::Rook;
+    /// use ajedrez::{Piece, Square};
+    /// use ajedrez::Color::White;
+    /// let s = Square {piece: Some(Piece::new(White, Rook)), rank: 1, file: 'a'};
+    /// assert_eq!(s.as_fen(), 'R');
+    /// ```
     pub fn as_fen(&self) -> char {
         match self.piece {
             Some(_) => self.piece.unwrap().as_fen(),
@@ -223,6 +283,16 @@ impl Square {
         }
     }
 
+    /// Returns a tuple with the zero-base index of the square inside the Chess board.
+    /// TODO: Rethink the way indexes are stored. Maybe move to use zero-based indexing by default and provide helpers
+    /// to the translation.
+    /// ```
+    /// use ajedrez::PieceType::Rook;
+    /// use ajedrez::{Piece, Square};
+    /// use ajedrez::Color::White;
+    /// let s = Square {piece: Some(Piece::new(White, Rook)), rank: 1, file: 'a'};
+    /// assert_eq!(s.to_zero_based_index(), (0,0));
+    /// ```
     pub fn to_zero_based_index(&self) -> (usize, usize) {
         (self.rank - 1, self.file.file_to_zero_base_index().unwrap())
     }
@@ -238,14 +308,20 @@ impl fmt::Display for Square {
 }
 
 
-const FEN_REGEX: &str = concat!(
-r"(?<board>[KQRBNP1-8\/]+)\s+",
-r"(?<turn>[wb])\s+",
-r"(?<castling>[KQ-]+)\s+",
-r"(?<passant>[a-h1-8]+|\-)\s+",
-r"(?<halfmove>\d+)\s+",
-r"(?<fullmove>\d+)",
-);
+/// A structure that states the castling availability of a chess board.
+pub struct CastlingStatus {
+    /// White player can castle **kingside**
+    pub white_kingside: bool,
+    /// White player can castle **queenside**
+    pub white_queenside: bool,
+    /// Black player can castle **kingside**
+    pub black_kingside: bool,
+    /// White player can castle **queenside**
+    pub black_queenside: bool,
+    /// When true this means that there is a possibility of castling even if there are pieces in between the king and
+    /// the rook
+    pub check_empty_rows: bool
+}
 
 
 pub struct ChessBoard {
@@ -382,6 +458,7 @@ impl Move {
     }
 }
 
+#[derive(Copy, Clone)]
 pub enum ChessMove {
     Simple,
     CastleKingside,
@@ -633,18 +710,35 @@ impl ChessBoard {
     // Examples:
     // "KQkq"  indicates that both sides can castle on both sides.
     // "-" Neither side can castle
-    pub fn get_castling(&self) -> Vec<Piece> {
-        vec![]
+    pub fn get_castling(&self, check_empty_rows: bool) -> CastlingStatus {
+        CastlingStatus {
+            white_kingside: self.can_castle(White, ChessMove::CastleKingside, check_empty_rows),
+            white_queenside: self.can_castle(White, ChessMove::CastleQueenside, check_empty_rows),
+            black_kingside: self.can_castle(Black, ChessMove::CastleKingside, check_empty_rows),
+            black_queenside: self.can_castle(Black, ChessMove::CastleQueenside, check_empty_rows),
+            check_empty_rows: check_empty_rows
+        }
     }
 
     pub fn get_castling_as_string(&self) -> String {
-        // Convert the vector of structs into a string representation.
-        let castling: Vec<String> = self.get_castling().iter().map(|s| s.to_string()).collect();
-        if castling.is_empty() {
-            String::from("-")
-        } else {
-            castling.join("")
+        let castling= self.get_castling(false);
+        let mut s = String::new();
+        if castling.white_kingside {
+            s.push('K');
         }
+        if castling.white_queenside {
+            s.push('Q');
+        }
+        if castling.black_kingside {
+            s.push('k');
+        }
+        if castling.black_queenside {
+            s.push('q');
+        }
+        if s.is_empty() {
+            s.push('-');
+        }
+        s
     }
 
     /// Returns a ascii-art like string representation of the current state of the board.
@@ -1106,14 +1200,14 @@ impl ChessBoard {
                     }
                 }
 
-                if self.can_castle_kingside(position) {
+                if self.can_castle(king.color, ChessMove::CastleKingside ,false) {
                     moves.push(Move {
                         from: position,
                         to: (position.0, 6),
                         castling: true,
                     })
                 }
-                if self.can_castle_queenside(position) {
+                if self.can_castle(king.color, CastleQueenside, false) {
                     moves.push(Move {
                         from: position,
                         to: (position.0, 2),
@@ -1136,72 +1230,6 @@ impl ChessBoard {
             }
         }
         false // The king is not in check.
-    }
-
-    /// Analyzes the board to tell if the king at the given position can castle kingside
-    ///
-    /// The rules for castling are:
-    ///
-    /// - Neither the king nor the chosen rook has previously moved during the game.
-    /// - There are no pieces between the king and the chosen rook.
-    /// - The king is not currently in check.
-    /// - The squares that the king passes over are not attacked by an enemy piece, nor is the square where the king lands.
-    /// - The king does not pass through a square that is attacked by an enemy piece.
-    pub fn can_castle_kingside(&self, king_position: (usize, usize)) -> bool {
-        let (x, y) = king_position;
-        if y != 4 {
-            return false;
-        }
-
-        if let (Some(king), Some(rook)) = (self.squares[x][y].piece, self.squares[x][7].piece) {
-            let targeted = self.targeted_squares(king.color.inverse());
-            // Ensure that the pieces are the right type ...
-            return king.piece_type == PieceType::King && rook.piece_type == Rook
-                // .. and color
-                && rook.color == king.color
-                // ... the king and the kingside rook haven't moved
-                && king.moves == 0 && rook.moves == 0
-                // ... the squares between them are empty,
-                && self.squares[x][6].is_empty()
-                && self.squares[x][5].is_empty()
-                // ... the king isn't in check,
-                && !targeted.contains(&king_position)
-                //  ... doesn't move through check,
-                && !targeted.contains(&(x, 5))
-                // ... and isn't castling into check.
-                && !targeted.contains(&(x, 6));
-        }
-        false
-    }
-
-    /// Analyzes the board to tell if the king at the given position can castle kingside
-    pub fn can_castle_queenside(&self, king_position: (usize, usize)) -> bool {
-        let (x, y) = king_position;
-        if y != 4 {
-            return false;
-        }
-
-        if let (Some(king), Some(rook)) = (self.squares[x][y].piece, self.squares[x][0].piece) {
-            let targeted = self.targeted_squares(king.color.inverse());
-            // Ensure that the pieces are the right type ...
-            return king.piece_type == PieceType::King && rook.piece_type == Rook
-                // ... and color
-                && rook.color == king.color
-                // ... the king and the kingside rook haven't moved
-                && king.moves == 0 && rook.moves == 0
-                // ... the squares between them are empty,
-                && self.squares[x][1].is_empty()
-                && self.squares[x][2].is_empty()
-                && self.squares[x][3].is_empty()
-                // ... the king isn't in check,
-                && !targeted.contains(&king_position)
-                //  ... doesn't move through check,
-                && !targeted.contains(&(x, 1))
-                && !targeted.contains(&(x, 3))
-                // ... and isn't castling into check.
-                && !targeted.contains(&(x, 2));
-        }
-        false
     }
 
     /// Moves the piece and increments the movements counter
@@ -1253,7 +1281,67 @@ impl ChessBoard {
         Ok(action_str)
     }
 
-    /// Performs castling, constrained by the rules described on `can_castle_kingside`
+
+    /// Analyzes the board to tell if the king at the given position can castle
+    ///
+    /// ## Castling rules:
+    ///
+    /// 1. Neither the king nor the chosen rook has previously moved during the game.
+    /// 2. There are no pieces between the king and the chosen rook.
+    /// 3. The king is not currently in check.
+    /// 4. The squares that the king passes over are not attacked by an enemy piece, nor is the square where the king lands.
+    /// 5. The king does not pass through a square that is attacked by an enemy piece.
+    ///
+    /// ## Parameters
+    ///
+    /// * `color`: The player color. Either Black or White
+    /// * `castle_type`: Either `ChessMove::CastleKingside` or `CastleQueenside`. If you pass something else the method
+    ///    will fail silently and return false.
+    /// * `check_empty_squares`: If false it will ignore rule number #2
+    ///
+    /// ## Return
+    ///
+    /// True if the King can castle
+    pub fn can_castle(&self, color: Color, castle_type: ChessMove, check_empty_squares: bool) -> bool {
+        let row = if color == Color::Black { 0 } else { 7 };
+        let rook_col: usize;
+        let empty_squares: Vec<(usize, usize)>;
+        match castle_type {
+            ChessMove::CastleKingside => {
+                rook_col = DEFAULT_KINGSIDE_ROOK_COL;
+                empty_squares = vec![
+                    (row, DEFAULT_KING_COL + 1), (row, DEFAULT_KING_COL + 2),
+                ];
+            },
+            CastleQueenside => {
+                rook_col = DEFAULT_QUEENSIDE_ROOK_COL;
+                empty_squares = vec![
+                    (row, DEFAULT_KING_COL - 1), (row, DEFAULT_KING_COL - 2), (row, DEFAULT_KING_COL - 3),
+                ];
+            },
+            _ => { return false }
+        }
+
+        if let (Some(king), Some(rook)) = (self.squares[row][DEFAULT_KING_COL].piece, self.squares[row][rook_col].piece) {
+            let targeted = self.targeted_squares(king.color.inverse());
+            // Ensure that the pieces are the right type ...
+            return king.piece_type == PieceType::King && rook.piece_type == Rook
+                // ... and color
+                && rook.color == color && king.color == color
+                // ... the king and the kingside rook haven't moved
+                && king.moves == 0 && rook.moves == 0
+                // ... the squares between them are empty,
+                && if check_empty_squares {
+                empty_squares.iter().all(|p| self.squares[p.0][p.1].is_empty())
+            } else { true }
+                && !targeted.contains(&(row, DEFAULT_KING_COL))
+                //  ... doesn't move through check, and isn't castling into check.
+                && ! empty_squares.iter().any(|p| targeted.contains(p))
+        }
+        false
+    }
+
+    /// Performs castling, constrained by the rules described on `can_castle()`
     pub fn castle(&mut self, color: Color, castle_type: ChessMove) -> Result<String, ChessMoveError> {
         let row = match color {
             White => { 7 }
@@ -1271,7 +1359,7 @@ impl ChessBoard {
                 rook_col = 7;
                 nw_rook_col = 5;
             }
-            ChessMove::CastleQueenside => {
+            CastleQueenside => {
                 nw_king_col = 2;
                 rook_col = 0;
                 nw_rook_col = 3;
@@ -1279,7 +1367,7 @@ impl ChessBoard {
             _ => { return Err(ChessMoveError::CastlingForbidden); }
         };
 
-        if self.can_castle_kingside((row, king_col)) {
+        if self.can_castle(color, castle_type ,false) {
             let mut king = self.squares[row][king_col].piece.unwrap();
             king.moves += 1;
             let mut rook = self.squares[row][rook_col].piece.unwrap();
@@ -1303,114 +1391,11 @@ impl ChessBoard {
             self.highlighted.push(self.squares[row][nw_rook_col]);
             return match castle_type {
                 ChessMove::CastleKingside => Ok("Castles kingside".parse().unwrap()),
-                ChessMove::CastleQueenside => Ok("Castles Queenside".parse().unwrap()),
+                CastleQueenside => Ok("Castles Queenside".parse().unwrap()),
                 _ => Err(ChessMoveError::CastlingForbidden)
             };
         }
 
         Err(ChessMoveError::CastlingForbidden)
-    }
-}
-
-
-impl FromStr for ChessBoard {
-    type Err = ParseError;
-    fn from_str(s: &str) -> Result<Self, ParseError> {
-        if s.is_empty() { return Err(EmptyString); }
-        fn from_fen_str(representation: &str) -> Result<ChessBoard, ParseError> {
-            let re: Regex = RegexBuilder::new(FEN_REGEX).case_insensitive(true).build().unwrap();
-
-            if !re.is_match(representation) {
-                return Err(ParseError::InvalidFENString);
-            }
-            let caps = re.captures(representation).unwrap();
-            let pieces = &caps["board"];
-            let turn = caps.name("turn").unwrap().as_str();
-            // let castling = caps.name("castling").unwrap().as_str();
-            let passant = caps.name("passant").unwrap().as_str();
-            let halfmove = &caps["halfmove"].parse::<u32>().unwrap();
-            let fullmove = &caps["fullmove"].parse::<u32>().unwrap();
-
-            let mut rank: usize = BOARD_SIZE;
-            let mut file_iter = FILE_CHAR_RANGE.cycle();
-            let mut board = ChessBoard::new();
-
-
-            // Load the pieces
-            for c in pieces.chars() {
-                let file = &file_iter.next().clone().unwrap();
-                match c {
-                    'K' => {
-                        board.set_piece(rank, file, Color::White, PieceType::King);
-                    }
-                    'Q' => {
-                        board.set_piece(rank, file, Color::White, PieceType::Queen);
-                    }
-                    'R' => {
-                        board.set_piece(rank, file, Color::White, PieceType::Rook);
-                    }
-                    'B' => {
-                        board.set_piece(rank, file, Color::White, PieceType::Bishop);
-                    }
-                    'N' => {
-                        board.set_piece(rank, file, Color::White, PieceType::Knight);
-                    }
-                    'P' => {
-                        board.set_piece(rank, file, Color::White, PieceType::Pawn);
-                    }
-                    'k' => {
-                        board.set_piece(rank, file, Color::Black, PieceType::King);
-                    }
-                    'q' => {
-                        board.set_piece(rank, file, Color::Black, PieceType::Queen);
-                    }
-                    'r' => {
-                        board.set_piece(rank, file, Color::Black, PieceType::Rook);
-                    }
-                    'b' => {
-                        board.set_piece(rank, file, Color::Black, PieceType::Bishop);
-                    }
-                    'n' => {
-                        board.set_piece(rank, file, Color::Black, PieceType::Knight);
-                    }
-                    'p' => {
-                        board.set_piece(rank, file, Color::Black, PieceType::Pawn);
-                    }
-                    '1'..='8' => {
-                        // rank += c.to_digit(10).unwrap() as usize;
-                        for _ in file_iter.by_ref().take(c.to_digit(10).unwrap() as usize - 1) {}
-                    }
-                    '/' => {
-                        rank -= 1;
-                        file_iter = FILE_CHAR_RANGE.cycle();
-                    }
-                    _ => {}
-                }
-            }
-
-            // Set the turn
-            board.active_color = Color::from_str(turn).unwrap();
-
-            // Castling
-            // TODO: Implement castling loading
-
-            // En passant
-            // TODO: Implement the rest of en passant rules
-
-            board.passant_square = match passant {
-                "-" => None,
-                _ => {
-                    let p_file = passant.as_bytes()[0] as char;
-                    let p_rank = passant.as_bytes()[1] as usize;
-                    Some(board.squares[rank_to_index(p_rank)][c_file_to_index(&p_file)])
-                }
-            };
-            board.half_moves = *halfmove;
-            board.full_moves = *fullmove;
-
-            Ok(board)
-        }
-
-        from_fen_str(s)
     }
 }

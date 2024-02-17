@@ -4,7 +4,7 @@ mod tests {
 
     #[test]
     fn test_board_parse_fen() {
-        let board = match INITIAL_FEN_BOARD.from_fen_to_chessboard() {
+        let board = match INITIAL_FEN_BOARD.parse_fen() {
             Ok(b) => b,
             Err(e) => {
                 panic!("Parsing failed with the following error: {e:?}")
@@ -97,7 +97,7 @@ mod tests {
     }
 
     #[test]
-    fn test_board_as_fen() {
+    fn test_board_as_fen_0() {
         let mut board = ChessBoard::new();
         assert_eq!("8/8/8/8/8/8/8/8 w - - 0 0", board.as_fen());
 
@@ -108,5 +108,20 @@ mod tests {
         board.set_piece(1, &'h', Color::Black, PieceType::Rook);
 
         assert_eq!("R6R/8/8/8/8/8/8/r6r w - - 0 0", board.as_fen());
+    }
+
+    #[test]
+    fn test_board_as_fen_1() {
+        let fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+        assert_eq!(
+            fen,
+            fen.parse_fen().unwrap().as_fen()
+        );
+
+        let fen ="8/8/2rbk3/3P4/8/8/8/8 w - - 0 0";
+        assert_eq!(
+            fen,
+            fen.parse_fen().unwrap().as_fen()
+        );
     }
 }

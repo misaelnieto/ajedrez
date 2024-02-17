@@ -1,6 +1,6 @@
 use std::str::FromStr;
 
-use log::{debug, warn};
+use log::debug;
 use pest::iterators::Pair;
 use pest::Parser;
 use pest_derive::Parser;
@@ -18,7 +18,7 @@ struct FENParser;
 
 
 pub trait FENStringParsing {
-    fn from_fen_to_chessboard(&self) -> Result<ChessBoard, ParseError>;
+    fn parse_fen(&self) -> Result<ChessBoard, ParseError>;
 }
 
 trait ToPiece {
@@ -50,7 +50,7 @@ impl ToPiece for Pair<'_, Rule> {
 
 
 impl FENStringParsing for str {
-    fn from_fen_to_chessboard(&self) -> Result<ChessBoard, ParseError> {
+    fn parse_fen(&self) -> Result<ChessBoard, ParseError> {
         let parsed_fen = match FENParser::parse(fen::Rule::fen_board, &self) {
             Ok(mut pairs) => pairs.next().unwrap(),
             Err(e) => {
@@ -68,7 +68,7 @@ impl FENStringParsing for str {
                         let p2 = p1.into_inner().peek().unwrap();
                         if p2.as_rule() == Rule::empty_squares {
                             let blanks = p2.as_str().parse::<usize>().expect("Empty squares shouuld be a number between 1 and 8");
-                            for _ in 1..blanks {
+                            for _ in 0..blanks {
                                 board.set_piece_0(row, col, None);
                                 col += 1;
                             }
@@ -83,10 +83,6 @@ impl FENStringParsing for str {
                 }
                 Rule::active_color => {
                     board.active_color = Color::from_str(p0.as_str()).expect("Active color should be either 'b' or 'w'");
-                }
-                Rule::dash => {}
-                Rule::castling => {
-                    warn!("Nothing to do with castling information yet");
                 }
                 Rule::en_passant_square => {
                     board.passant_square = board.get_square_a(p0.as_str()) ;
@@ -103,6 +99,14 @@ impl FENStringParsing for str {
             }
         }
         Ok(board)
+    }
+}
+
+
+impl FromStr for ChessBoard {
+    type Err = ParseError;
+    fn from_str(s: &str) -> Result<Self, ParseError> {
+        s.parse_fen()
     }
 }
 

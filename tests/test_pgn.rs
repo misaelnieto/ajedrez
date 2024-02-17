@@ -12,8 +12,16 @@ mod tests {
     }
 
     #[test]
-    fn test_anastasian_lewis()  -> io::Result<()>  {
-        let input = fs::read_to_string("tests/pgn_games/anastasian-lewis.pgn").expect("Can't open anastasian-lewis.pgn");
+    fn test_morphy_karl_isouard_1858()  -> io::Result<()>  {
+        let input = fs::read_to_string("tests/pgn_games/morphy_karl_isouard_1858.pgn").expect("Can't open PGN file");
+        let game = PGNGame::new(&input);
+        game.unwrap().play();
+        Ok(())
+    }
+
+    #[test]
+    fn test_byrne_fischer_1956()  -> io::Result<()>  {
+        let input = fs::read_to_string("tests/pgn_games/byrne_fischer_1956.pgn").expect("Can't open PGN file");
         let game = PGNGame::new(&input);
         game.unwrap().play();
         Ok(())

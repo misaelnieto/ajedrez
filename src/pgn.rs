@@ -1,11 +1,10 @@
 use std::collections::HashMap;
-use std::str::FromStr;
 
 use pest::iterators::Pair;
 use pest::Parser;
 use pest_derive::Parser;
 
-use crate::{ChessBoard, ChessMove, ChessMoveError, Color, File2Index, Move, PieceType, Rank2Index, rank_to_index};
+use crate::{ChessBoard, ChessMove, ChessMoveError, Color, FENStringParsing, File2Index, Move, PieceType, Rank2Index, rank_to_index};
 use crate::fen::INITIAL_FEN_BOARD;
 use crate::PieceType::{Bishop, King, Knight, Pawn, Queen, Rook};
 
@@ -89,7 +88,7 @@ impl<'a> PGNGame<'a> {
             .expect("Invalid PGN file") // unwrap the parse result
             .next().unwrap();
         let mut g = PGNGame {
-            board: ChessBoard::from_str(INITIAL_FEN_BOARD).expect("Error parsing initial FEN board"),
+            board: INITIAL_FEN_BOARD.parse_fen().expect("Error parsing initial FEN board"),
             metadata: HashMap::new(),
             game_result: String::new(),
             moves: Vec::new(),

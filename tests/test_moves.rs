@@ -2,7 +2,7 @@
 mod tests {
     use std::str::FromStr;
 
-    use ajedrez::{BOARD_SIZE_RANGE_0, ChessBoard, Move, ParseError, pos_from_str};
+    use ajedrez::{BOARD_SIZE_RANGE_0, ChessMove, Color, FENStringParsing, Move, ParseError, pos_from_str};
 
     #[test]
     fn test_move_from_str() {
@@ -26,7 +26,7 @@ mod tests {
 
     #[test]
     fn test_generate_pawn_moves_initial() {
-        let board = ChessBoard::from_str("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR b KQkq - 0 1").unwrap();
+        let board = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR b KQkq - 0 1".parse_fen().unwrap();
 
         // Fail gracefully: empty moves for anything else but pawns
         for i in [0, 2, 3, 4, 5, 7] {
@@ -57,7 +57,7 @@ mod tests {
     #[test]
     fn test_generate_pawn_moves_capture() {
         // White pawn
-        let mut board = ChessBoard::from_str("8/8/2rbk3/3P4/8/8/8/8 w - - 0 0").unwrap();
+        let mut board = "8/8/2rbk3/3P4/8/8/8/8 w - - 0 0".parse_fen().unwrap();
         // The pawn may capture either the rook or the knight, but not the bishop, which blocks
         // the pawn from moving directly forward. So only 2 moves
         let possible_moves = board.generate_intrinsic_pawn_moves((3, 3));
@@ -68,7 +68,7 @@ mod tests {
         assert_eq!((2, 4), possible_moves[1].to);
 
         // Black pawn
-        board = ChessBoard::from_str("8/8/8/8/3p4/2RBK3/8/8 w - - 0 0").unwrap();
+        board = "8/8/8/8/3p4/2RBK3/8/8 w - - 0 0".parse_fen().unwrap();
         let possible_moves = board.generate_intrinsic_pawn_moves((4, 3));
         assert_eq!(2, possible_moves.len());
         assert_eq!((5, 2), possible_moves[0].to);
@@ -77,7 +77,7 @@ mod tests {
 
     #[test]
     fn test_generate_knight_moves_initial() {
-        let board = ChessBoard::from_str("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR b KQkq - 0 1").unwrap();
+        let board = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR b KQkq - 0 1".parse_fen().unwrap();
         let default_knight_positions = [(0, 1), (0, 6), (7, 1), (7, 6)];
 
         // Fail gracefully: empty moves for anything else but Knights
@@ -122,7 +122,7 @@ mod tests {
 
     #[test]
     fn test_generate_knight_moves_no_pieces() {
-        let board = ChessBoard::from_str("1n6/8/8/8/8/5N2/8/8 b KQkq - 0 1").unwrap();
+        let board = "1n6/8/8/8/8/5N2/8/8 b KQkq - 0 1".parse_fen().unwrap();
 
         // Black horse only has 3 possible moves ...
         let mut possible_moves = board.generate_intrinsic_knight_moves((0, 1));
@@ -147,7 +147,7 @@ mod tests {
 
     #[test]
     fn test_generate_bishop_moves_initial() {
-        let board = ChessBoard::from_str("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR b KQkq - 0 1").unwrap();
+        let board = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR b KQkq - 0 1".parse_fen().unwrap();
 
         // Fail gracefully: On this initial setup, bishops cannot move at all
         for i in BOARD_SIZE_RANGE_0 {
@@ -160,7 +160,7 @@ mod tests {
 
     #[test]
     fn test_generate_bishop_moves_initial_empty() {
-        let board = ChessBoard::from_str("2b2b2/8/8/8/8/8/8/2B2B2 w - - 0 0").unwrap();
+        let board = "2b2b2/8/8/8/8/8/8/2B2B2 w - - 0 0".parse_fen().unwrap();
         let default_bishop_positions = [(0, 2), (0, 5), (7, 2), (7, 5)];
 
         // Default movements for Knight at c8
@@ -206,7 +206,7 @@ mod tests {
 
     #[test]
     fn test_generate_bishop_moves_x() {
-        let board = ChessBoard::from_str("8/3p4/8/5B2/3b4/8/2P5/8 w - - 0 0").unwrap();
+        let board = "8/3p4/8/5B2/3b4/8/2P5/8 w - - 0 0".parse_fen().unwrap();
 
         // Available movements for Bishop at d4
         let mut possible_moves = board.generate_intrinsic_bishop_moves((4, 3));
@@ -239,7 +239,7 @@ mod tests {
 
     #[test]
     fn test_generate_rook_moves_initial() {
-        let board = ChessBoard::from_str("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR b KQkq - 0 1").unwrap();
+        let board = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR b KQkq - 0 1".parse_fen().unwrap();
 
         // Fail gracefully: On this initial setup, rooks cannot move at all
         for i in BOARD_SIZE_RANGE_0 {
@@ -253,7 +253,7 @@ mod tests {
     #[test]
     fn test_generate_rook_moves_wikipedia() {
         // Example board taken from wikipedia
-        let board = ChessBoard::from_str("8/4P1r1/8/6p1/3R4/8/8/8 w - - 0 0").unwrap();
+        let board = "8/4P1r1/8/6p1/3R4/8/8/8 w - - 0 0".parse_fen().unwrap();
 
         // Available movements for Rook at g7, 4 to empty squares and 1 capture (e7)
         let mut possible_moves = board.generate_intrinsic_rook_moves((1, 6));
@@ -282,7 +282,7 @@ mod tests {
 
     #[test]
     fn test_generate_king_moves_initial() {
-        let board = ChessBoard::from_str("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR b KQkq - 0 1").unwrap();
+        let board = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR b KQkq - 0 1".parse_fen().unwrap();
 
         // Fail gracefully: On this initial setup, the king cannot move at all
         // and the rest of the pieces will not generate moves for generate_king_moves
@@ -296,7 +296,7 @@ mod tests {
 
     #[test]
     fn test_generate_king_moves_initial_empty() {
-        let board = ChessBoard::from_str("4k3/8/8/8/8/8/8/4K3 w - - 0 0").unwrap();
+        let board = "4k3/8/8/8/8/8/8/4K3 w - - 0 0".parse_fen().unwrap();
 
         // Available movements for King at e8, 4 to empty squares and 1 capture (e7)
         let mut possible_moves = board.generate_intrinsic_king_moves((0, 4));
@@ -320,7 +320,7 @@ mod tests {
     #[test]
     fn test_generate_king_moves_checkmate() {
         // Example board taken from wikipedia, a king checkmate
-        let mut board = ChessBoard::from_str("5r2/7q/6N1/8/1P1k4/5Q2/B7/3R2K1 w - - 0 0").unwrap();
+        let mut board = "5r2/7q/6N1/8/1P1k4/5Q2/B7/3R2K1 w - - 0 0".parse_fen().unwrap();
         let kings_pos = pos_from_str("d4").unwrap();
 
         // The black king at d4 is in checkmate by the white rook at d1
@@ -338,22 +338,22 @@ mod tests {
     #[test]
     fn test_castling_kingside() {
         // Example board taken from wikipedia, Castling
-        let board = ChessBoard::from_str("r3k2r/8/8/8/8/8/8/R3K2R w - - 0 0").unwrap();
-        assert!(board.can_castle_kingside(pos_from_str("e8").unwrap()));
-        assert!(board.can_castle_kingside(pos_from_str("e1").unwrap()));
+        let board = "r3k2r/8/8/8/8/8/8/R3K2R w - - 0 0".parse_fen().unwrap();
+        assert!(board.can_castle(Color::White, ChessMove::CastleKingside, true));
+        assert!(board.can_castle(Color::Black, ChessMove::CastleKingside, true));
     }
 
     #[test]
     fn test_castling_queenside() {
         // Example board taken from wikipedia, Castling
-        let board = ChessBoard::from_str("r3k2r/8/8/8/8/8/8/R3K2R w - - 0 0").unwrap();
-        assert!(board.can_castle_queenside(pos_from_str("e8").unwrap()));
-        assert!(board.can_castle_queenside(pos_from_str("e1").unwrap()));
+        let board = "r3k2r/8/8/8/8/8/8/R3K2R w - - 0 0".parse_fen().unwrap();
+        assert!(board.can_castle(Color::Black, ChessMove::CastleQueenside, true));
+        assert!(board.can_castle(Color::White, ChessMove::CastleQueenside, true));
     }
 
     #[test]
     fn test_generate_queen_moves_initial() {
-        let board = ChessBoard::from_str("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR b KQkq - 0 1").unwrap();
+        let board = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR b KQkq - 0 1".parse_fen().unwrap();
 
         // Fail gracefully: On this initial setup, the queen cannot move at all
         // and the rest of the pieces will not generate moves for generate_queen_moves()
@@ -367,7 +367,7 @@ mod tests {
 
     #[test]
     fn test_generate_queen_moves_initial_empty() {
-        let board = ChessBoard::from_str("3q4/8/8/8/8/8/8/3Q4 b - - 0 0").unwrap();
+        let board = "3q4/8/8/8/8/8/8/3Q4 b - - 0 0".parse_fen().unwrap();
 
         // Available movements for Queen at d8
         let mut possible_moves = board.generate_intrinsic_queen_moves(pos_from_str("d8").unwrap());
@@ -422,7 +422,7 @@ mod tests {
 
     #[test]
     fn test_generate_queen_moves_restricted() {
-        let board = ChessBoard::from_str("8/8/2ppp3/2pQp3/2ppp3/8/8/8 w - - 0 0").unwrap();
+        let board = "8/8/2ppp3/2pQp3/2ppp3/8/8/8 w - - 0 0".parse_fen().unwrap();
 
         // Available movements for Queen at d5
         let possible_moves = board.generate_intrinsic_queen_moves(pos_from_str("d5").unwrap());
