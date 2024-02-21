@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod tests {
-    use ajedrez::{BoardAsFEN, ChessBoard, Color, FENStringParsing, INITIAL_FEN_BOARD, PieceType};
+    use ajedrez::{BoardAsFEN, ChessBoard, Color, FENStringParsing, PieceType, INITIAL_FEN_BOARD};
 
     #[test]
     fn test_board_parse_fen() {
@@ -113,15 +113,9 @@ mod tests {
     #[test]
     fn test_board_as_fen_1() {
         let fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
-        assert_eq!(
-            fen,
-            fen.parse_fen().unwrap().as_fen()
-        );
+        assert_eq!(fen, fen.parse_fen().unwrap().as_fen());
 
-        let fen ="8/8/2rbk3/3P4/8/8/8/8 w - - 0 0";
-        assert_eq!(
-            fen,
-            fen.parse_fen().unwrap().as_fen()
-        );
+        let fen = "8/8/2rbk3/3P4/8/8/8/8 w - - 0 0";
+        assert_eq!(fen, fen.parse_fen().unwrap().as_fen());
     }
 }

@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod tests {
-    use std::str::FromStr;
     use ajedrez::Color;
+    use std::str::FromStr;
 
     #[test]
     fn test_color_from_str() {
@@ -22,5 +22,4 @@ mod tests {
         assert!(Color::from_str("Nope").is_err());
         assert!(Color::from_str("").is_err());
     }
-
 }

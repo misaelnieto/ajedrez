@@ -2,7 +2,9 @@
 mod tests {
     use std::str::FromStr;
 
-    use ajedrez::{BOARD_SIZE_RANGE_0, ChessMove, Color, FENStringParsing, Move, ParseError, pos_from_str};
+    use ajedrez::{
+        pos_from_str, ChessMove, Color, FENStringParsing, Move, ParseError, BOARD_SIZE_RANGE_0,
+    };
 
     #[test]
     fn test_move_from_str() {
@@ -26,7 +28,9 @@ mod tests {
 
     #[test]
     fn test_generate_pawn_moves_initial() {
-        let board = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR b KQkq - 0 1".parse_fen().unwrap();
+        let board = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR b KQkq - 0 1"
+            .parse_fen()
+            .unwrap();
 
         // Fail gracefully: empty moves for anything else but pawns
         for i in [0, 2, 3, 4, 5, 7] {
@@ -77,7 +81,9 @@ mod tests {
 
     #[test]
     fn test_generate_knight_moves_initial() {
-        let board = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR b KQkq - 0 1".parse_fen().unwrap();
+        let board = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR b KQkq - 0 1"
+            .parse_fen()
+            .unwrap();
         let default_knight_positions = [(0, 1), (0, 6), (7, 1), (7, 6)];
 
         // Fail gracefully: empty moves for anything else but Knights
@@ -131,7 +137,6 @@ mod tests {
         assert_eq!((2, 2), possible_moves[1].to);
         assert_eq!((2, 0), possible_moves[2].to);
 
-
         possible_moves = board.generate_intrinsic_knight_moves((5, 5));
         // ... while the White horse has all 8 possible moves
         assert_eq!(8, possible_moves.len());
@@ -147,7 +152,9 @@ mod tests {
 
     #[test]
     fn test_generate_bishop_moves_initial() {
-        let board = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR b KQkq - 0 1".parse_fen().unwrap();
+        let board = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR b KQkq - 0 1"
+            .parse_fen()
+            .unwrap();
 
         // Fail gracefully: On this initial setup, bishops cannot move at all
         for i in BOARD_SIZE_RANGE_0 {
@@ -239,7 +246,9 @@ mod tests {
 
     #[test]
     fn test_generate_rook_moves_initial() {
-        let board = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR b KQkq - 0 1".parse_fen().unwrap();
+        let board = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR b KQkq - 0 1"
+            .parse_fen()
+            .unwrap();
 
         // Fail gracefully: On this initial setup, rooks cannot move at all
         for i in BOARD_SIZE_RANGE_0 {
@@ -282,7 +291,9 @@ mod tests {
 
     #[test]
     fn test_generate_king_moves_initial() {
-        let board = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR b KQkq - 0 1".parse_fen().unwrap();
+        let board = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR b KQkq - 0 1"
+            .parse_fen()
+            .unwrap();
 
         // Fail gracefully: On this initial setup, the king cannot move at all
         // and the rest of the pieces will not generate moves for generate_king_moves
@@ -320,7 +331,9 @@ mod tests {
     #[test]
     fn test_generate_king_moves_checkmate() {
         // Example board taken from wikipedia, a king checkmate
-        let mut board = "5r2/7q/6N1/8/1P1k4/5Q2/B7/3R2K1 w - - 0 0".parse_fen().unwrap();
+        let mut board = "5r2/7q/6N1/8/1P1k4/5Q2/B7/3R2K1 w - - 0 0"
+            .parse_fen()
+            .unwrap();
         let kings_pos = pos_from_str("d4").unwrap();
 
         // The black king at d4 is in checkmate by the white rook at d1
@@ -353,7 +366,9 @@ mod tests {
 
     #[test]
     fn test_generate_queen_moves_initial() {
-        let board = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR b KQkq - 0 1".parse_fen().unwrap();
+        let board = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR b KQkq - 0 1"
+            .parse_fen()
+            .unwrap();
 
         // Fail gracefully: On this initial setup, the queen cannot move at all
         // and the rest of the pieces will not generate moves for generate_queen_moves()

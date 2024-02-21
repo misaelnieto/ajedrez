@@ -5,17 +5,15 @@ use pest::iterators::Pair;
 use pest::Parser;
 use pest_derive::Parser;
 
-use crate::{BOARD_SIZE, ChessBoard, Color, fen, ParseError, Piece};
 use crate::Color::{Black, White};
 use crate::PieceType::{Bishop, King, Knight, Pawn, Queen, Rook};
+use crate::{fen, ChessBoard, Color, ParseError, Piece, BOARD_SIZE};
 
 pub const INITIAL_FEN_BOARD: &str = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w - - 0 0";
-
 
 #[derive(Parser)]
 #[grammar = "fen.pest"]
 struct FENParser;
-
 
 pub trait FENStringParsing {
     fn parse_fen(&self) -> Result<ChessBoard, ParseError>;
@@ -41,13 +39,15 @@ impl ToPiece for Pair<'_, Rule> {
             Rule::black_queen => Some(Piece::new(Black, Queen)),
             Rule::black_rook => Some(Piece::new(Black, Rook)),
             _ => {
-                debug!("{:?} Cannot be converted to any chess piece", self.as_rule());
+                debug!(
+                    "{:?} Cannot be converted to any chess piece",
+                    self.as_rule()
+                );
                 return None;
             }
         }
     }
 }
-
 
 impl FENStringParsing for str {
     fn parse_fen(&self) -> Result<ChessBoard, ParseError> {
@@ -67,7 +67,10 @@ impl FENStringParsing for str {
                     for p1 in p0.into_inner() {
                         let p2 = p1.into_inner().peek().unwrap();
                         if p2.as_rule() == Rule::empty_squares {
-                            let blanks = p2.as_str().parse::<usize>().expect("Empty squares shouuld be a number between 1 and 8");
+                            let blanks = p2
+                                .as_str()
+                                .parse::<usize>()
+                                .expect("Empty squares shouuld be a number between 1 and 8");
                             for _ in 0..blanks {
                                 board.set_piece_0(row, col, None);
                                 col += 1;
@@ -82,16 +85,23 @@ impl FENStringParsing for str {
                     row += 1;
                 }
                 Rule::active_color => {
-                    board.active_color = Color::from_str(p0.as_str()).expect("Active color should be either 'b' or 'w'");
+                    board.active_color = Color::from_str(p0.as_str())
+                        .expect("Active color should be either 'b' or 'w'");
                 }
                 Rule::en_passant_square => {
-                    board.passant_square = board.get_square_a(p0.as_str()) ;
+                    board.passant_square = board.get_square_a(p0.as_str());
                 }
                 Rule::half_moves => {
-                    board.half_moves = p0.as_str().parse().expect("Half moves should be an integer");
+                    board.half_moves = p0
+                        .as_str()
+                        .parse()
+                        .expect("Half moves should be an integer");
                 }
                 Rule::full_moves => {
-                    board.full_moves = p0.as_str().parse().expect("Full moves should be an integer");
+                    board.full_moves = p0
+                        .as_str()
+                        .parse()
+                        .expect("Full moves should be an integer");
                 }
                 _ => {
                     debug!("Ignoring rule {:?}", p0.as_rule());
@@ -102,14 +112,12 @@ impl FENStringParsing for str {
     }
 }
 
-
 impl FromStr for ChessBoard {
     type Err = ParseError;
     fn from_str(s: &str) -> Result<Self, ParseError> {
         s.parse_fen()
     }
 }
-
 
 pub trait BoardAsFEN {
     fn as_fen(&self) -> String;
@@ -139,17 +147,17 @@ impl BoardAsFEN for ChessBoard {
                 fen_code.push('/');
             }
         }
-        fen_code.push_str(
-            &*format!(" {} {} {} {} {}",
-                      self.active_color,
-                      self.get_castling_as_string(),
-                      match self.passant_square {
-                          None => '-',
-                          Some(_) => self.passant_square.unwrap().as_fen()
-                      },
-                      self.half_moves,
-                      self.full_moves)
-        );
+        fen_code.push_str(&*format!(
+            " {} {} {} {} {}",
+            self.active_color,
+            self.get_castling_as_string(),
+            match self.passant_square {
+                None => '-',
+                Some(_) => self.passant_square.unwrap().as_fen(),
+            },
+            self.half_moves,
+            self.full_moves
+        ));
         fen_code
     }
 }
