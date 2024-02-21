@@ -1,4 +1,6 @@
 use std::collections::HashMap;
+use std::fmt::Write;
+use log::warn;
 
 use pest::iterators::Pair;
 use pest::Parser;
@@ -22,7 +24,9 @@ pub struct PieceMove<'a> {
     from_col: i8,
     to_row: i8,
     to_col: i8,
+    /// zero based index row disambiguator
     row_disambiguator: i8,
+    /// zero based index column disambiguator
     col_disambiguator: i8,
 
     // Fields are useful for debugging purposes
@@ -141,12 +145,11 @@ impl<'a> PGNGame<'a> {
         println!("---------------------------------------------");
         println!("| Game starts!                               ");
         for ix in 0..self.moves.len() {
-            print!("{:3} Move -> ", ix + 1);
             // Access the full_move by index. Clone it to avoid borrowing issues.
             let full_move = self.moves[ix].clone();
             println!(
                 "{}",
-                self.process_move_pair(ix, &full_move)
+                self.process_move_pair(&full_move)
                     .expect("Full move should be valid")
             );
             println!("{}", self.board.as_str());
@@ -159,30 +162,32 @@ impl<'a> PGNGame<'a> {
 
     pub fn process_move_pair(
         &mut self,
-        move_ix: usize,
-        full_move: &Pair<Rule>,
+        move_pair: &Pair<Rule>,
     ) -> Result<String, ChessMoveError> {
-        let complete_moves: Vec<Pair<Rule>> = full_move
-            .clone()
-            .into_inner()
-            .filter(|p| p.as_rule() == Rule::complete_move)
-            .into_iter()
-            .collect();
-        // White
-        let mut log_str = self
-            .process_complete_move(move_ix, Color::White, &complete_moves[0])
-            .unwrap();
-        log_str = format!("{}: White {}", complete_moves[0].as_str(), log_str);
-
-        // Black
-        if complete_moves.len() > 1 {
-            log_str = format!(
-                "{} | {}: Black {}",
-                log_str,
-                complete_moves[1].as_str(),
-                self.process_complete_move(move_ix, Color::Black, &complete_moves[1])
-                    .unwrap()
-            );
+        let mut move_number: usize = 0;
+        let mut log_str = String::new();
+        for mv in move_pair.clone().into_inner() {
+            match mv.as_rule() {
+                Rule::move_number => {
+                    move_number = mv.as_str().parse().expect("move_number should be an integer");
+                    write!(log_str, "Move {move_number}: ").unwrap();
+                }
+                Rule::white_move => {
+                    write!(
+                        log_str, "White: {}",
+                        self.process_complete_move(move_number, Color::White, &mv)
+                        .unwrap()).unwrap();
+                }
+                Rule::black_move => {
+                    write!(
+                        log_str, " | Black: {}",
+                        self.process_complete_move(move_number, Color::Black, &mv)
+                            .unwrap()).unwrap();
+                }
+                _ => {
+                    warn!("Ignoring rule {:?} while processing move_pair", mv.as_rule())
+                }
+            }
         }
         Ok(log_str)
     }
@@ -225,10 +230,10 @@ impl<'a> PGNGame<'a> {
         let mut available_pieces = self.board.find_pieces(movement.piece, movement.color);
 
         // If we have a disambiguator, discard pieces that are not from that column
-        if movement.row_disambiguator > 0 {
+        if movement.row_disambiguator >= 0 {
             available_pieces.retain(|sq| sq.row == movement.row_disambiguator as usize);
         }
-        if movement.col_disambiguator > 0 {
+        if movement.col_disambiguator >= 0 {
             available_pieces.retain(|sq| sq.col == movement.col_disambiguator as usize);
         }
 

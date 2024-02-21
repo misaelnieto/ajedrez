@@ -17,9 +17,10 @@ move_piece_with_capture = ${ piece ~ disambiguator? ~ "x" ~ to_file ~ to_rank }
 move_pawn_promotion = ${files ~ promoted_ranks ~ "=" ~ promoted_piece}
 move_pawn_promotion_with_capture = ${files ~ "x" ~ files ~ promoted_ranks ~ "=" ~ promoted_piece}
 move_piece = { (move_pawn_promotion | move_pawn_promotion_with_capture | move_piece_with_capture | move_piece_without_capture_disambiguator |move_piece_without_capture)}
-complete_move = { (move_piece | castle_queenside | castle_kingside) ~ ("+" | "#")? }
+white_move = { (move_piece | castle_queenside | castle_kingside) ~ ("+" | "#")? }
+black_move = { (move_piece | castle_queenside | castle_kingside) ~ ("+" | "#")? }
 move_number = @{ ASCII_DIGIT+}
-move_pair = { move_number ~ "." ~ complete_move ~ move_comment? ~ ((ASCII_DIGIT)+ ~ "...")? ~ complete_move? ~ move_comment? }
+move_pair = { move_number ~ "." ~ white_move ~ move_comment? ~ ((ASCII_DIGIT)+ ~ "...")? ~ black_move? ~ move_comment? }
 move_list = { (move_pair)+ }
 game_result = { "1/2-1/2" | "1-0" | "0-1" }
 game = { SOI ~ (metadata_block)* ~ move_list ~ game_result ~ EOI}
