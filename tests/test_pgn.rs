@@ -29,4 +29,13 @@ mod tests {
         game.unwrap().play();
         Ok(())
     }
+
+    #[test]
+    fn test_andersen_kieseritzky_1851() -> io::Result<()> {
+        let input = fs::read_to_string("tests/pgn_games/andersen_kieseritzky_1851.pgn")
+            .expect("Can't open PGN file");
+        let game = PGNGame::new(&input);
+        game.unwrap().play();
+        Ok(())
+    }
 }
