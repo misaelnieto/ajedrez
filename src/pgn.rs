@@ -1,6 +1,6 @@
+use log::warn;
 use std::collections::HashMap;
 use std::fmt::Write;
-use log::warn;
 
 use pest::iterators::Pair;
 use pest::Parser;
@@ -160,32 +160,41 @@ impl<'a> PGNGame<'a> {
         println!("---------------------------------------------");
     }
 
-    pub fn process_move_pair(
-        &mut self,
-        move_pair: &Pair<Rule>,
-    ) -> Result<String, ChessMoveError> {
+    pub fn process_move_pair(&mut self, move_pair: &Pair<Rule>) -> Result<String, ChessMoveError> {
         let mut move_number: usize = 0;
         let mut log_str = String::new();
         for mv in move_pair.clone().into_inner() {
             match mv.as_rule() {
                 Rule::move_number => {
-                    move_number = mv.as_str().parse().expect("move_number should be an integer");
+                    move_number = mv
+                        .as_str()
+                        .parse()
+                        .expect("move_number should be an integer");
                     write!(log_str, "Move {move_number}: ").unwrap();
                 }
                 Rule::white_move => {
                     write!(
-                        log_str, "White: {}",
+                        log_str,
+                        "White: {}",
                         self.process_complete_move(move_number, Color::White, &mv)
-                        .unwrap()).unwrap();
+                            .unwrap()
+                    )
+                    .unwrap();
                 }
                 Rule::black_move => {
                     write!(
-                        log_str, " | Black: {}",
+                        log_str,
+                        " | Black: {}",
                         self.process_complete_move(move_number, Color::Black, &mv)
-                            .unwrap()).unwrap();
+                            .unwrap()
+                    )
+                    .unwrap();
                 }
                 _ => {
-                    warn!("Ignoring rule {:?} while processing move_pair", mv.as_rule())
+                    warn!(
+                        "Ignoring rule {:?} while processing move_pair",
+                        mv.as_rule()
+                    )
                 }
             }
         }

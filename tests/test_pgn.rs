@@ -32,8 +32,8 @@ mod tests {
 
     #[test]
     fn test_fischer_spassky() -> io::Result<()> {
-        let input = fs::read_to_string("tests/pgn_games/fischer-spassky.pgn")
-            .expect("Can't open PGN file");
+        let input =
+            fs::read_to_string("tests/pgn_games/fischer-spassky.pgn").expect("Can't open PGN file");
         let game = PGNGame::new(&input);
         game.unwrap().play();
         Ok(())
@@ -41,8 +41,8 @@ mod tests {
 
     #[test]
     fn test_shenzlong24() -> io::Result<()> {
-        let input = fs::read_to_string("tests/pgn_games/shenzlong24.pgn")
-            .expect("Can't open PGN file");
+        let input =
+            fs::read_to_string("tests/pgn_games/shenzlong24.pgn").expect("Can't open PGN file");
         let game = PGNGame::new(&input);
         game.unwrap().play();
         Ok(())

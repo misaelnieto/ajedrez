@@ -796,7 +796,7 @@ impl ChessBoard {
                         } else {
                             piece.to_unicode_symbol().to_string().blue()
                         }
-                    },
+                    }
                     None => ' '.to_string().into(),
                 };
                 if self.highlighted.contains_key(&(row, col)) {
