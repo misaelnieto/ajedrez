@@ -790,10 +790,15 @@ impl ChessBoard {
             b.push_str(&*format!("{} │", row));
             for col in BOARD_SIZE_RANGE_0 {
                 let token = match self.squares[row][col].piece {
-                    Some(piece) => piece.to_unicode_symbol(),
-                    None => ' ',
-                }
-                .to_string();
+                    Some(piece) => {
+                        if piece.color == White {
+                            piece.to_unicode_symbol().to_string().yellow()
+                        } else {
+                            piece.to_unicode_symbol().to_string().blue()
+                        }
+                    },
+                    None => ' '.to_string().into(),
+                };
                 if self.highlighted.contains_key(&(row, col)) {
                     if self.highlighted.get(&(row, col)).unwrap() == &White {
                         b.push_str(&*format!(" {} │", token.black().on_yellow()));
