@@ -1,16 +1,42 @@
 [package]
 name = "ajedrez"
-version = "0.1.0"
-edition = "2021"
-authors = ["Noe Nieto<nnieto@noenieto.com>"]
 description = "A naive implementation of a chess engine library"
+readme.workspace = true
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+categories.workspace = true
+keywords.workspace = true
+
+[package.metadata.docs.rs]
+rustdoc-args = ["--cfg", "docsrs"]
+all-features = true
+
+[workspace]
+members = [
+    "gui"
+]
+
+[workspace.package]
+repository = "https://github.com/misaelnieto/ajedrez/"
 readme = "README.md"
+version = "0.0.1"
+edition = "2021"
+authors = ["Noe Nieto <nnieto@noenieto.com>"]
 license = "MIT OR Apache-2.0"
-keywords = ["chess", "library"]
+keywords = ["chess", "library", "game"]
 categories = ["game-engines"]
 # Not a public project yet
 publish = false
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[workspace.dependencies]
+ajedrez = { version = "0.0.1", path = "." }
+ajedrez_gui = { version = "0.0.1", path = "gui" }
+
+[badges]
+maintenance = { status = "experimental" }
 
 [dependencies]
 pest = "2.7.6"
