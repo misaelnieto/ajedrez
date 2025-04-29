@@ -1,26 +1,23 @@
 # Ajedrez
 
-This is a naive implementation of a chess game engine. I started it to lear rust.
+> **Yet another naive implementation of a chess game engine**
 
-Features:
+This is a simple implementation of a chess game engine. I started it to learn Rust with the assistance of ChatGPT. Over time, I realized that some of the recommendations provided by ChatGPT were likely inspired by https://github.com/jhlywa/chess.js.git, as certain implementations seemed quite familiar to me later.
 
-[x] Basic board structure and movement validator
-[x] Basic PGN loader
-[x] Basic FEN support 
-[x] Tests
-[x] Performance tests
-[ ] User interface
-[ ] Documentation
-[ ] Published on crates.io
-[ ] Best practices
-[ ] Thread safety
-[ ] Stable API
-[ ] Runs on MacOS
-[ ] Runs on Windows
-[ ] Runs on Linux
-[ ] Runs on Wasm
-[ ] Runs on Android
-[ ] Runs on ESP32
-[ ] Runs on browser
-[ ] Runs on one embedded device
-[ ] Users :'(
+Dual-licensed under [Apache 2.0](LICENSE-APACHE) or [MIT](LICENSE-MIT).
+
+
+# Features
+
+- [x] Basic board structure and movement validation
+- [x] Basic PGN loader
+- [x] Basic FEN support 
+- [x] Unit tests
+- [x] Performance benchmarks
+- [ ] User interface
+- [ ] Comprehensive documentation
+- [ ] Published on crates.io
+- [ ] Adherence to best practices
+- [ ] Thread safety
+- [ ] Stable API
+- [ ] Active user base :'(

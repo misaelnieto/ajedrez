@@ -1,7 +1,110 @@
+//! # Ajedrez: A Chess Library in Rust
+//!
+//! Ajedrez is a Rust library for representing and manipulating chess games. It
+//! provides tools for working with chessboards, pieces, moves, and game states.
+//!
+//! ## Features
+//! - Full representation of a chessboard and its pieces.
+//! - Move generation for all pieces, including special moves like castling and
+//!   en passant.
+//! - Parsing and generating FEN strings for board states.
+//! - Support for PGN parsing and move representation.
+//! - Utilities for detecting check, checkmate, and valid moves.
+//!
+//! ## Example: Creating a Chessboard and Making Moves
+//! ```rust
+//! use ajedrez::{ChessBoard, Color, PieceType};
+//!
+//! fn main() {
+//!     let mut board = ChessBoard::new();
+//!
+//!     // Set up a custom position
+//!     board.set_piece(1, &'e', Color::White, PieceType::Pawn);
+//!     board.set_piece(8, &'e', Color::Black, PieceType::King);
+//!
+//!     // Print the board
+//!     println!("{}", board.as_str());
+//!
+//!     // Generate moves for a white pawn
+//!     let moves = board.generate_intrinsic_pawn_moves((6, 4));
+//!     for mov in moves {
+//!         println!("Pawn can move from {:?} to {:?}", mov.from, mov.to);
+//!     }
+//! }
+//! ```
+//!
+//! ## Advanced Usage
+//!
+//! ### Parsing FEN Strings
+//! Ajedrez supports parsing FEN strings to initialize board states. This is
+//! useful for loading games or testing specific scenarios.
+//!
+//! ```rust
+//! use ajedrez::{ChessBoard, BoardAsFEN};
+//!
+//! fn main() {
+//!     let fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+//!     let board = ChessBoard::from_fen(fen).unwrap();
+//!     println!("{}", board.as_str());
+//! }
+//! ```
+//!
+//! ### Detecting Check and Checkmate
+//! The library provides utilities to detect if a king is in check or checkmate.
+//!
+//! ```rust
+//! use ajedrez::{ChessBoard, Color};
+//!
+//! fn main() {
+//!     let mut board = ChessBoard::new();
+//!
+//!     // Set up a simple checkmate position
+//!     board.set_piece(1, &'e', Color::Black, PieceType::King);
+//!     board.set_piece(8, &'e', Color::White, PieceType::Queen);
+//!     board.set_piece(8, &'d', Color::White, PieceType::King);
+//!
+//!     // Check if the black king is in checkmate
+//!     let black_king_pos = (0, 4); // e8
+//!     if board.is_king_in_check(black_king_pos) {
+//!         println!("The black king is in check!");
+//!     }
+//! }
+//! ```
+//!
+//! ### Generating Moves
+//! Ajedrez can generate valid moves for any piece on the board, taking into
+//! account the rules of chess.
+//!
+//! ```rust
+//! use ajedrez::{ChessBoard, Color, PieceType};
+//!
+//! fn main() {
+//!     let mut board = ChessBoard::new();
+//!
+//!     // Place a knight on the board
+//!     board.set_piece(4, &'d', Color::White, PieceType::Knight);
+//!
+//!     // Generate moves for the knight
+//!     let moves = board.generate_intrinsic_knight_moves((4, 3));
+//!     for mov in moves {
+//!         println!("Knight can move from {:?} to {:?}", mov.from, mov.to);
+//!     }
+//! }
+//! ```
+//!
+//! ## Additional Notes
+//! - The library assumes a standard 8x8 chessboard.
+//! - It is designed to be extensible for custom rules or variants of chess.
+//! - Contributions and feedback are welcome!
+
+// Copyright ⓒ 2023-2025 Noe Nieto
+
+
 use std::collections::{BTreeSet, HashMap};
 use std::fmt;
 use std::ops::{Range, RangeInclusive};
 use std::str::FromStr;
+use thiserror::Error;
 
 use colored::Colorize;
 
@@ -14,15 +117,23 @@ use crate::PieceType::{Bishop, King, Knight, Pawn, Queen, Rook};
 mod fen;
 mod pgn;
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Error)]
 pub enum ParseError {
+    #[error("The string is empty")]
     EmptyString,
+    #[error("The string is too short")]
     StringTooShort,
+    #[error("The FEN string is invalid")]
     InvalidFENString,
+    #[error("The position is invalid")]
     InvalidPosition,
+    #[error("The rank is invalid")]
     InvalidPositionRank,
+    #[error("The file is invalid")]
     InvalidPositionFile,
+    #[error("The move is useless")]
     UselessMove,
+    #[error("The algebraic position is invalid")]
     InvalidAlgebraicPosition,
 }
 
@@ -782,7 +893,7 @@ impl ChessBoard {
     }
 
     /// Returns an ascii-art like string representation of the current state of the board.
-    pub fn as_str(&mut self) -> String {
+    pub fn as_str(&self) -> String {
         let mut b = String::from("");
         b.push_str("    a   b   c   d   e   f   g   h\n");
         b.push_str("  ┌───┬───┬───┬───┬───┬───┬───┬───┐\n");
